@@ -46,8 +46,9 @@ header {
 }
 
 .logo-image {
-  height: 30px;
+  height: 50px;
   width: auto;
+  align-items: center;
 }
 
 /* --- Busca Principal (Estrutura) --- */
@@ -173,20 +174,41 @@ main {
 
 /* --- Footer --- */
 footer {
-  background-color: #000;
-  padding: 20px 0;
-  text-align: center;
-  border-top: 2px solid #333;
-  margin-top: 40px;
+  background-color: #1a1a1a; /* Cor de fundo escura */
+  color: #fff;
+  padding: 20px 40px;
+  display: flex;
+  justify-content: space-between; /* Distribui o espaço entre links e redes sociais */
+  align-items: center;
+  border-top: 1px solid #333;
 }
 
 .footer-links a {
-  color: var(--text-color);
+  color: #aaa;
   text-decoration: none;
-  margin: 0 15px;
+  margin-right: 20px;
+  font-size: 0.9rem;
   transition: color 0.3s;
 }
 
 .footer-links a:hover {
-  color: var(--primary-color);
+  color: var(--primary-color, #9900ff); /* Use sua cor primária */
+}
+
+/* --- Estilos das Redes Sociais --- */
+
+.social-media a {
+  color: #fff; /* Ícones brancos ou claros */
+  font-size: 1.2rem;
+  margin-left: 15px; /* Espaço entre os ícones */
+  transition: color 0.3s;
+}
+
+.social-media a:hover {
+  color: var(--primary-color, #9900ff); /* Cor de destaque no hover */
+}
+
+/* Garante que o ícone do Font Awesome seja exibido corretamente */
+.social-media a i {
+  /* Não precisa de regras específicas, a classe 'fab' já cuida disso */
 }
