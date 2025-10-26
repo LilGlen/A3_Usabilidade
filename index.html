@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SYNTHX.COM</title>
+    <link rel="stylesheet" href="src/styles/styles.css" />
+    <link rel="stylesheet" href="src/styles/components.css" />
+    <link rel="stylesheet" href="src/styles/utils.css" />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"
+    />
+  </head>
+  <body>
+    <header>
+      <div class="header-container">
+        <div class="logo">
+          <a href="/" aria-label="Página inicial SYNTHX.COM" title="SYNTHX.COM">
+            <img
+              src="/src/assets/synthx-logo.png"
+              alt="SYNTHX.COM Logo"
+              class="logo-image"
+            />
+          </a>
+        </div>
+
+        <div class="search-bar">
+          <div class="search-input-container">
+            <input
+              type="text"
+              id="searchInput"
+              placeholder="Search for game."
+            />
+            <button id="searchButton" class="search-btn">
+              <i class="fas fa-search"></i>
+            </button>
+            <div
+              id="searchSuggestionsContainer"
+              class="suggestion-dropdown"
+              style="display: none"
+            ></div>
+          </div>
+        </div>
+
+        <div class="auth-buttons">
+          <button class="btn btn-login">
+            <i class="fas fa-user"></i> Entrar
+          </button>
+          <button class="btn btn-register">
+            <i class="fas fa-sign-in-alt"></i> Cadastrar
+          </button>
+
+          <a
+            href="#"
+            id="cart-link"
+            class="btn cart-btn"
+            aria-label="Carrinho de Compras"
+          >
+            <i class="fas fa-shopping-cart"></i>
+            <span id="cart-counter" class="cart-counter">0</span>
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section id="hero-section" class="hero-section">
+        <div class="hero-content"></div>
+      </section>
+
+      <div id="mainStoreContent">
+        <section class="game-section">
+          <h3 class="section-title">PROMOTIONS</h3>
+          <div id="promotionsContainer" class="game-grid"></div>
+        </section>
+
+        <section class="game-section">
+          <h3 class="section-title">MOST POPULAR</h3>
+          <div id="popularContainer" class="game-grid"></div>
+        </section>
+
+        <section class="game-section">
+          <h3 class="section-title">NEW RELEASES</h3>
+          <div id="newReleasesContainer" class="game-grid"></div>
+        </section>
+      </div>
+
+      <div id="searchResultContainer" style="display: none">
+        <h3 class="section-title">Search Results</h3>
+        <div id="searchResultGrid" class="game-grid"></div>
+      </div>
+    </main>
+
+    <footer>
+      <div class="footer-links">
+        <a href="#">About Us</a>
+        <a href="#">Support</a>
+        <a href="#">Terms of Service</a>
+      </div>
+    </footer>
+
+    <div id="cart-off-canvas" class="cart-panel">
+      <div class="cart-header">
+        <h4>Seu Carrinho</h4>
+        <button
+          class="close-btn"
+          onclick="document.getElementById('cart-off-canvas').classList.remove('open');"
+        >
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <div id="cart-items-list" class="cart-items">
+        <p>Seu carrinho está vazio.</p>
+      </div>
+      <div class="cart-summary">
+        <p>Total: <span id="cart-total">R$ 0,00</span></p>
+        <button id="checkout-button-id" class="btn btn-checkout">
+          Finalizar Compra
+        </button>
+      </div>
+    </div>
+
+    <div id="custom-notification" class="bottom-notification-bar">
+      <span id="notification-message"></span>
+      <div id="confirmation-actions"></div>
+    </div>
+
+    <script src="src/main.js" type="module"></script>
+  </body>
+</html>

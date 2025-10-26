@@ -1,0 +1,394 @@
+/* src/styles/components.css */
+
+/* --- Botões de Autenticação e Ação --- */
+.auth-buttons {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background-color 0.3s, transform 0.1s;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  text-transform: uppercase;
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+}
+
+.btn-login {
+  background-color: transparent;
+  color: var(--primary-color);
+  border: 1px solid var(--primary-color);
+}
+
+.btn-login:hover {
+  background-color: rgba(147, 51, 234, 0.1);
+}
+
+.btn-register {
+  background-color: var(--primary-color);
+  color: white;
+}
+
+.btn-register:hover {
+  background-color: #6a1b9a;
+}
+
+.btn-buy-now {
+  background-color: var(--highlight-color);
+  color: var(--secondary-color); /* Texto escuro no fundo ciano */
+  padding: 15px 30px;
+  font-size: 1.1em;
+  border-radius: 30px;
+  font-weight: 900;
+}
+
+.btn-buy-now:hover {
+  background-color: #00e0b0;
+  transform: scale(1.03);
+}
+
+/* --- Botão do Carrinho --- */
+.cart-btn {
+  background-color: transparent;
+  color: var(--highlight-color);
+  border: 1px solid var(--highlight-color);
+  position: relative;
+  padding: 10px 15px;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: background-color 0.3s, border-color 0.3s;
+}
+
+.cart-btn:hover {
+  background-color: rgba(0, 255, 196, 0.1);
+}
+
+.cart-counter {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background-color: var(--primary-color);
+  color: white;
+  font-size: 0.7em;
+  font-weight: bold;
+  border-radius: 50%;
+  padding: 2px 6px;
+  min-width: 20px;
+  text-align: center;
+  line-height: 1.2;
+  display: none;
+}
+
+.cart-counter.active {
+  display: block;
+}
+
+/* --- Game Card --- */
+.game-card {
+  background-color: #242424;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+  transition: transform 0.3s, box-shadow 0.3s;
+  position: relative;
+  padding-bottom: 10px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+}
+
+.game-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.8);
+}
+
+.game-cover {
+  width: 100%;
+  padding-top: 130%; /* Proporção de capa de jogo */
+  background-color: #000;
+  background-size: cover;
+  background-position: center;
+  margin-bottom: 10px;
+}
+
+.game-title {
+  padding: 0 15px;
+  margin: 5px 0;
+  color: white;
+  font-size: 1.1em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-height: 24px;
+}
+
+.price-info {
+  padding: 0 15px;
+  display: flex;
+  align-items: center;
+  margin-top: 5px;
+}
+
+.current-price {
+  color: var(--highlight-color);
+  font-weight: bold;
+  font-size: 1.2em;
+}
+
+.add-cart-btn {
+  margin: 10px 15px 0;
+  background-color: var(--primary-color);
+  color: white;
+  padding: 8px 15px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background-color 0.2s;
+  text-transform: uppercase;
+  font-size: 0.9em;
+}
+
+.add-cart-btn:hover {
+  background-color: #6a1b9a;
+}
+
+/* --- GRID DE JOGOS (Usado no Dashboard e Resultados de Busca) --- */
+.game-grid {
+  display: grid;
+  /* Padrão para telas grandes: 5 colunas */
+  grid-template-columns: repeat(4, 1fr);
+  gap: 30px;
+  padding-top: 20px;
+  padding-bottom: 40px;
+}
+
+/* Ajustes Responsivos para o Grid */
+@media (max-width: 1200px) {
+  .game-grid {
+    /* Mantido em 4 colunas */
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  .game-grid {
+    /* Telas menores (tablets): 3 colunas */
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .game-grid {
+    /* Telas mobile: 2 colunas */
+    grid-template-columns: repeat(2, 1fr);
+    gap: 15px;
+  }
+}
+
+/* --- Sugestões de Busca --- */
+.suggestion-dropdown {
+  position: absolute;
+  top: 100%;
+  left: -1px;
+  right: -1px;
+  z-index: 1000;
+  background-color: var(--input-bg-color);
+  border: 1px solid var(--primary-color);
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.7);
+  max-height: 250px;
+  overflow-y: auto;
+  /* display: none; é a forma como o JS irá controlar */
+}
+
+.suggestion-item {
+  padding: 10px 15px;
+  cursor: pointer;
+  color: var(--text-color);
+  border-bottom: 1px solid #333;
+  transition: background-color 0.2s;
+  font-size: 0.95em;
+}
+
+.suggestion-item:last-child {
+  border-bottom: none;
+}
+
+.suggestion-item:hover {
+  background-color: #333;
+  color: var(--highlight-color);
+}
+/* --- Painel Lateral do Carrinho (Off-Canvas) --- */
+.cart-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 380px; /* Largura do painel */
+  height: 100%;
+  background-color: #1a1a1a; /* Cor de fundo do painel */
+  color: var(--text-color);
+  box-shadow: -5px 0 15px rgba(0, 0, 0, 0.5);
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+
+  /* Posição inicial (fora da tela) */
+  transform: translateX(100%);
+  transition: transform 0.4s ease-in-out;
+}
+
+.cart-panel.open {
+  /* Posição final (na tela) */
+  transform: translateX(0);
+}
+
+.cart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+  border-bottom: 2px solid var(--primary-color);
+  background-color: #000;
+}
+
+.cart-header h4 {
+  margin: 0;
+  color: var(--primary-color);
+  font-size: 1.4em;
+}
+
+.cart-header .close-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-color);
+  font-size: 1.5em;
+  cursor: pointer;
+  padding: 5px;
+}
+
+.cart-items {
+  flex-grow: 1;
+  overflow-y: auto;
+  padding: 10px 20px;
+}
+
+.empty-cart {
+  text-align: center;
+  padding: 40px 0;
+  color: #999;
+}
+
+.cart-summary {
+  padding: 15px 20px;
+  border-top: 1px solid #333;
+  background-color: #242424;
+}
+
+.cart-summary p {
+  display: flex;
+  justify-content: space-between;
+  font-size: 1.2em;
+  font-weight: bold;
+  color: var(--text-color);
+}
+
+#cart-total {
+  color: var(--highlight-color);
+  font-size: 1.4em;
+}
+
+.btn-checkout {
+  width: 100%;
+  padding: 12px;
+  background-color: var(--highlight-color);
+  color: var(--secondary-color);
+  font-weight: bold;
+  margin-top: 10px;
+}
+
+/* Estilo para Itens do Carrinho (Baseado no seu HTML do renderCartItem) */
+.cart-item {
+  display: flex;
+  gap: 15px;
+  padding: 10px 0;
+  border-bottom: 1px solid #333;
+  align-items: center;
+}
+
+.cart-item:last-child {
+  border-bottom: none;
+}
+
+.item-cover {
+  width: 60px;
+  height: 80px;
+  background-size: cover;
+  background-position: center;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.item-details {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 80px; /* Garante alinhamento */
+}
+
+.item-title {
+  color: white;
+  font-weight: 600;
+  font-size: 0.9em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.item-quantity,
+.item-price {
+  color: #999;
+  font-size: 0.8em;
+}
+
+.item-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: space-between;
+  min-height: 80px;
+}
+
+.item-subtotal {
+  color: var(--highlight-color);
+  font-weight: bold;
+  font-size: 1em;
+}
+
+.remove-btn {
+  background: transparent;
+  border: none;
+  color: #666;
+  font-size: 1.8em;
+  cursor: pointer;
+  transition: color 0.2s;
+  line-height: 1;
+}
+
+.remove-btn:hover {
+  color: var(--error-color);
+}
