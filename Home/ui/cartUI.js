@@ -1,6 +1,7 @@
-import { formatCurrency, getGameImageUrl } from "../utils/helpers.js";
+import { formatCurrency } from "../utils/helpers.js";
 import { removeFromCart } from "../js/cart.js";
 import { showAlertNotification } from "./notifications.js";
+import { getGameImageUrl } from "../ui/utils.js";
 
 const cartPanel = document.getElementById("cart-off-canvas");
 const cartItemsList = document.getElementById("cart-items-list");
