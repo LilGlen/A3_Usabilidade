@@ -1,6 +1,5 @@
 import { setDebouncedFilterGames } from "./js/config.js";
-import { debounce } from "./js/utils.js";
-// Garantindo que 'logout' está importado, como solicitado.
+import { debounce, loadTemplate } from "./js/utils.js";
 import { loginAndGetToken, logout, checkAuthStatus } from "./js/auth.js";
 import { fetchAllGames, loadGames, filterGames } from "./js/games.js";
 import {
@@ -25,6 +24,9 @@ import {
  * Função principal para inicializar toda a aplicação.
  */
 async function init() {
+  await loadTemplate("src/templates/header.html", "header");
+  await loadTemplate("src/templates/footer.html", "footer");
+
   await loginAndGetToken();
 
   const user = checkAuthStatus();
