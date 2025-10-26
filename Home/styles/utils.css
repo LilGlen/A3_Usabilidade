@@ -1,0 +1,137 @@
+/* src/styles/utils.css */
+
+/* --- Notificações (Toasts) e Confirmações --- */
+.bottom-notification-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 3000;
+  padding: 15px 20px;
+  color: white;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.5);
+
+  transform: translateY(100%);
+  opacity: 0;
+  transition: transform 0.5s ease-out, opacity 0.5s ease-out;
+}
+
+.bottom-notification-bar.show {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+/* Tipos de Alerta */
+.bottom-notification-bar.info {
+  background-color: var(--info-color);
+}
+
+.bottom-notification-bar.success {
+  background-color: var(--success-color);
+}
+
+.bottom-notification-bar.error {
+  background-color: var(--error-color);
+}
+
+#notification-message {
+  font-weight: bold;
+  flex-grow: 1;
+  margin-right: 20px;
+}
+
+#confirmation-actions button {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid white;
+  color: white;
+  padding: 8px 15px;
+  margin-left: 10px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+#confirmation-actions button:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* --- Mensagens de Erro e Carregamento --- */
+.error-text {
+  color: var(--error-color);
+  font-weight: bold;
+  text-align: center;
+  padding: 20px;
+}
+
+.loading-search {
+  color: #999;
+  text-align: center;
+  padding: 30px;
+  font-size: 1.2em;
+}
+
+/* --- Cart Off-Canvas Panel (Estilos de sobreposição) --- */
+/* Estes estilos de layout estão em components.css, mas se quiser ter uma sobreposição de fundo escuro: */
+body.cart-open {
+  overflow: hidden; /* Evita scroll na página principal */
+}
+
+/* Opcional: Adicionar um backdrop escuro atrás do carrinho (requer JS para adicionar classe ao body/main) */
+
+/* --- Estilos para as Telas de Login/Cadastro --- */
+.login-container,
+.register-container {
+  max-width: 400px;
+  margin: 100px auto;
+  padding: 40px;
+  background-color: #242424;
+  border-radius: 8px;
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.5);
+  text-align: center;
+}
+
+.login-container h2,
+.register-container h2 {
+  color: var(--primary-color);
+  margin-bottom: 25px;
+}
+
+.login-container form,
+.register-container form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.login-container input,
+.register-container input {
+  width: 100%;
+  padding: 12px 15px;
+  border: 1px solid #333;
+  border-radius: 4px;
+  background-color: var(--input-bg-color);
+  color: var(--text-color);
+  font-size: 1em;
+}
+
+.login-container p a,
+.register-container p a {
+  color: var(--highlight-color);
+  text-decoration: underline;
+}
+
+/* --- Estilos para a Tela de Detalhes do Jogo --- */
+.details-section {
+  padding: 40px 0;
+}
+
+.game-content {
+  background-color: #242424;
+  padding: 30px;
+  border-radius: 8px;
+  min-height: 400px;
+  
+}
