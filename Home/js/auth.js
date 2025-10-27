@@ -7,7 +7,6 @@ import {
 } from "./config.js";
 import { renderLoginState } from "../ui/render.js";
 
-// Constantes para as chaves do localStorage (Boa prática)
 const AUTH_TOKEN_KEY = "authToken";
 const USER_NAME_KEY = "userName";
 
@@ -24,7 +23,7 @@ export function getToken() {
  */
 export function clearToken() {
   localStorage.removeItem(AUTH_TOKEN_KEY);
-  localStorage.removeItem(USER_NAME_KEY); // Limpa o nome do usuário (se existir)
+  localStorage.removeItem(USER_NAME_KEY);
   renderLoginState();
 }
 
@@ -38,18 +37,18 @@ export function isGenericClientToken(token = getToken()) {
 }
 
 /**
- * VERIFICA O ESTADO DE AUTENTICAÇÃO (FUNÇÃO NECESSÁRIA PELO main.js)
+ * VERIFICA O ESTADO DE AUTENTICAÇÃO
  * Verifica o status de autenticação.
  * @returns {object} Um objeto com o status de login (boolean) e o nome do usuário (string).
  */
 export function checkAuthStatus() {
   const token = getToken();
-  // Se não há um nome salvo no localStorage (caso de login de usuário),
+  // Se não há um nome salvo no localStorage,
   // usamos "Cliente" ou "Usuário" como padrão.
   const userName = localStorage.getItem(USER_NAME_KEY) || "Cliente";
 
   return {
-    loggedIn: !!token, // Converte a presença do token em true/false
+    loggedIn: !!token,
     name: userName,
   };
 }
@@ -109,12 +108,7 @@ export function logout() {
   // Nomeando como 'logout' para maior clareza
   console.log("Iniciando processo de logout...");
   localStorage.removeItem(AUTH_TOKEN_KEY);
-  localStorage.removeItem(USER_NAME_KEY); // Limpa o nome do usuário
+  localStorage.removeItem(USER_NAME_KEY); 
 
-  // Atualiza a UI para o estado DESLOGADO
-  // renderLoginState(false); // Essa chamada será feita no main.js para garantir a recarga.
-
-  console.log("Logout foi");
-  // Redireciona ou recarrega a página após a limpeza
-  window.location.href = "../Login/login.html"; // Redireciona para a página inicial
+  window.location.href = "../Login/login.html"; // Redireciona para a página de login
 }

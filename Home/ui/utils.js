@@ -6,7 +6,7 @@
  */
 export function getGameImageUrl(jogo) {
   if (!jogo || !jogo.nome) {
-    return "/src/assets/imgs/Bloodborne.jpg"; // Placeholder genérico
+    return "/Home/assets/imgs/Bloodborne.jpg"; // Placeholder genérico
   }
 
   // 1. Normaliza o nome do jogo (remove espaços, caracteres especiais, converte para minúsculas)
@@ -27,7 +27,7 @@ export function getGameImageUrl(jogo) {
   // 3. Tenta encontrar a imagem no mapeamento
   const nomeDoArquivo = mapeamento[nomeNormalizado];
   if (nomeDoArquivo) {
-    return `/src/assets/imgs/${nomeDoArquivo}`;
+    return `/Home/assets/imgs/${nomeDoArquivo}`;
   }
 
   // 4. Se não encontrar no mapeamento, tenta o formato padrão: Nome_Com_Underscores.jpg
@@ -43,7 +43,7 @@ export function getGameImageUrl(jogo) {
 
   // Simplesmente retorna o nome normalizado para o caminho, esperando que o nome da API seja similar
   // aos seus arquivos (ex: "Half-Life: Alyx" -> "Half_Life_Alyx.jpg" (se a API retornar o nome original))
-  return `/src/assets/imgs/${fileBaseName}.jpg`;
+  return `/Home/assets/imgs/${fileBaseName}.jpg`;
 }
 
 
@@ -52,6 +52,6 @@ export function getGameImageUrl(jogo) {
  * @param {number} jogoId - ID do jogo.
  */
 export function showDetails(jogoId) {
-  // Caminho que estava no seu código original (ajuste se necessário)
+  
   window.location.href = `../Jogo/jogo.html?id=${jogoId}`;
 }
