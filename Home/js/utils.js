@@ -14,7 +14,7 @@ export function debounce(func, delay) {
 }
 /**
  * Carrega e injeta conteúdo HTML de um arquivo template em um elemento placeholder.
- * @param {string} templatePath - Caminho relativo para o arquivo HTML (ex: 'src/templates/header.html').
+ * @param {string} templatePath - Caminho relativo para o arquivo HTML
  * @param {string} elementSelector - Seletor do elemento (header, footer, etc.) que receberá o HTML.
  * @returns {Promise<void>}
  */
@@ -38,15 +38,25 @@ export async function loadTemplate(templatePath, elementSelector) {
     console.error("Falha ao carregar o template:", error);
   }
 }
+
 /**
  * Busca o nome de um jogo no cache global usando seu ID.
  * @param {number} id - O ID do jogo.
  * @returns {string} O nome do jogo ou um fallback.
  */
 export function getGameNameById(id) {
-  // Assumindo que window.gamesCache é um array de todos os jogos carregados
-  const game = window.gamesCache?.find((g) => g.id === id);
+  const gamesCache = window.allGames;
 
-  // Retorna o nome, ou o ID com um prefixo se não for encontrado.
+  if (!gamesCache || gamesCache.length === 0) {
+    console.warn("Cache de jogos (window.allGames) não carregado.");
+    return `Jogo ID ${id}`;
+  }
+
+  const numericId = Number(id);
+
+  // Tenta encontrar o jogo pelo ID
+  const game = gamesCache.find((g) => Number(g.id) === numericId);
+
+  // Retorna o nome, ou o fallback se não for encontrado.
   return game ? game.nome : `Jogo ID ${id}`;
 }

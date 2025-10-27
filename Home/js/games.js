@@ -2,18 +2,16 @@ import {
   GAME_ENDPOINT,
   allGames,
   setAllGames,
-  debouncedFilterGames,
 } from "./config.js";
-import { getToken, clearToken, loginAndGetToken } from "./auth.js";
+import { getToken, logout } from "./auth.js";
 import {
-  renderHighlight,
   renderSection,
   renderSuggestions,
   renderGameCard,
 } from "../ui/render.js";
 
 // ----------------------------------------------------
-// FUNÇÃO DE BUSCA DE DADOS (NOVA FUNÇÃO EXPORTADA)
+// FUNÇÃO DE BUSCA DE DADOS
 // ----------------------------------------------------
 
 /**
@@ -22,41 +20,31 @@ import {
  */
 export async function fetchAllGames() {
   const token = getToken();
-  const headers = {}; // Inicializa o objeto de cabeçalhos
+  const headers = {};
 
-  // 🔑 CORREÇÃO PRINCIPAL: Adiciona o cabeçalho 'Authorization' APENAS SE o token existir.
-  // A requisição ocorrerá mesmo sem o token.
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  // Opcional: Adiciona o cabeçalho Content-Type, que é boa prática
   headers["Content-Type"] = "application/json";
 
   try {
     const url = `${GAME_ENDPOINT}`;
     const response = await fetch(url, {
       method: "GET",
-      headers: headers, // Usa o objeto headers, que pode ou não conter Authorization
+      headers: headers,
     });
 
     if (!response.ok) {
       if (response.status === 401 || response.status === 403) {
-        // Se a API retornar 401/403, significa que o token é obrigatório ou inválido.
-        // Limpamos o token e tentamos fazer login novamente.
         console.warn("Token inválido ou expirado. Limpando token.");
-        clearToken();
-
-        // 🚨 Opcional: Você pode querer forçar o login aqui ou apenas retornar null.
-        // Já que você está chamando essa função no init(), retornar null é mais seguro.
+        logout();
       }
-      // Se for 401/403 (e você limpou), ou outro erro (e.g., 500), ainda lançamos a falha.
       throw new Error("Falha ao buscar jogos. Status: " + response.status);
     }
 
     const games = await response.json();
 
-    // Armazena a lista de jogos no módulo config e globalmente para ser usada no filtro/cache
     setAllGames(games);
     window.allGames = games;
 
@@ -68,12 +56,11 @@ export async function fetchAllGames() {
 }
 
 // ----------------------------------------------------
-// FUNÇÃO PRINCIPAL DE CARREGAMENTO (AJUSTADA)
+// FUNÇÃO PRINCIPAL DE CARREGAMENTO
 // ----------------------------------------------------
 
 /**
  * Recebe a lista de jogos, inicializa o estado de carregamento e distribui para as seções.
- * Esta função agora é chamada pelo main.js DEPOIS que ele chama fetchAllGames.
  * @param {Array<object>} games - A lista de jogos (allGames).
  * @returns {Object | null} O jogo de destaque.
  */
@@ -83,11 +70,9 @@ export async function loadGames(games) {
     document.getElementById("main-highlight");
   const promoContainer = document.getElementById("promotionsContainer");
 
-  // 1. Limpa e mostra estado de carregamento (apenas nos containers)
+  // 1. Limpa e mostra estado de carregamento
   if (highlightContainer) highlightContainer.innerHTML = "";
   if (promoContainer) promoContainer.innerHTML = "<p>Carregando...</p>";
-  // ... (Inicialização de loading para outros containers) ...
-
   if (!games || games.length === 0) {
     const message = "<p>Nenhum jogo encontrado no momento.</p>";
     if (promoContainer) promoContainer.innerHTML = message;
@@ -116,15 +101,14 @@ export function distributeAndRenderGames(gamesToRender) {
     "searchResultContainer"
   );
   const mainStoreContent = document.getElementById("mainStoreContent");
-  const heroSection = document.getElementById("hero-section"); // 🚨 NOVO: Obtém a seção do herói (VERIFIQUE SE ESTE ID ESTÁ CORRETO NO SEU HTML)
+  const heroSection = document.getElementById("hero-section");
 
-  if (!searchResultContainer || !mainStoreContent || !heroSection) return; // 🚨 Adiciona verificação para heroSection
+  if (!searchResultContainer || !mainStoreContent || !heroSection) return;
 
-  // Se a busca estiver vazia, renderiza o layout da dashboard
   if (searchTerm === "") {
     searchResultContainer.style.display = "none";
     mainStoreContent.style.display = "block";
-    heroSection.style.display = "block"; // 🟢 MOSTRA o herói na homepage
+    heroSection.style.display = "block";
 
     const games = gamesToRender;
 
@@ -142,7 +126,7 @@ export function distributeAndRenderGames(gamesToRender) {
     // Modo de Busca: Esconde as seções e mostra apenas os resultados
     mainStoreContent.style.display = "none";
     searchResultContainer.style.display = "block";
-    heroSection.style.display = "none"; // 🔴 ESCONDE o herói na busca
+    heroSection.style.display = "none";
 
     const searchContainer = document.getElementById("searchResultGrid");
     if (!searchContainer) return;

@@ -1,5 +1,5 @@
 import { BASE_URL } from "./config.js";
-import { getToken, clearToken, loginAndGetToken } from "./auth.js";
+import { getToken, clearToken, loginAndGetToken, logout } from "./auth.js";
 import {
   showAlertNotification,
   showConfirmation,
@@ -39,7 +39,6 @@ export async function loadCartItems() {
   }
 
   if (allGamesCache.length === 0) {
-    // Renderiza vazio e notifica, mas não impede a busca do contador
     console.warn("Cache de jogos vazio. Renderizando apenas o carrinho vazio.");
   }
 
@@ -52,7 +51,7 @@ export async function loadCartItems() {
 
     if (!response.ok) {
       if (response.status === 401) {
-        clearToken();
+        logout();
         showAlertNotification(
           "Sua sessão expirou. Faça login novamente.",
           "error"
@@ -113,7 +112,7 @@ export async function updateCartCounter() {
 
     if (!response.ok) {
       if (response.status === 401) {
-        clearToken();
+        logout();
       }
       updateUiCartCounter(0);
       return;
@@ -163,7 +162,7 @@ export async function addToCart(jogoId) {
       showAlertNotification("Jogo adicionado ao carrinho!", "success");
     } else {
       if (response.status === 401 || response.status === 403) {
-        clearToken();
+        logout();
         await loginAndGetToken();
         showAlertNotification(
           "Sua sessão expirou. Tentando reconectar...",
@@ -211,7 +210,6 @@ export async function removeFromCart(jogoId) {
   }
 
   try {
-    // Assumindo que o endpoint para remover é DELETE /carrinho/{jogoId}
     const url = `${BASE_URL}/carrinho/${jogoId}`;
 
     const response = await fetch(url, {
@@ -238,7 +236,7 @@ export async function removeFromCart(jogoId) {
 }
 
 /**
- * Inicia o processo de Finalização de Compra (Checkout). (Mantida)
+ * Inicia o processo de Finalização de Compra (Checkout).
  * @param {string} isGenericClientToken - Uma função que verifica se o token é genérico.
  */
 export async function startCheckout(isGenericClientTokenFn) {
@@ -249,12 +247,8 @@ export async function startCheckout(isGenericClientTokenFn) {
       "Você não pode finalizar a compra usando uma sessão de navegação genérica. Por favor, faça login.",
       "info"
     );
-    clearToken();
+    logout();
     return;
   }
-  // ... (restante da lógica de checkout) ...
-  showAlertNotification(
-    "Funcionalidade de Checkout ainda será implementada!",
-    "info"
-  );
+  window.location.href = "../Checkout/index.html";
 }

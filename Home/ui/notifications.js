@@ -13,19 +13,16 @@ export function showAlertNotification(message, type = "info") {
 
   if (!toast || !msgEl || !actionsEl) return;
 
-  // Se houver uma confirmação pendente, não exibe o alerta
   if (currentConfirmationResolve) return;
 
   msgEl.textContent = message;
   actionsEl.innerHTML = ""; // Limpa botões de confirmação
 
-  // Usa a classe do canto inferior (assumindo que o HTML foi ajustado para estes IDs)
   toast.className = `bottom-notification-bar show ${type}`;
 
-  // Tempo de exibição
   setTimeout(() => {
     toast.classList.remove("show");
-  }, 7000);
+  }, 5000);
 }
 
 /**

@@ -1,6 +1,6 @@
 import { getGameImageUrl, showDetails } from "./utils.js";
 import { addToCart } from "../js/cart.js";
-import { selectSuggestion } from "../js/games.js"; // Importa a função de busca
+import { selectSuggestion } from "../js/games.js"; 
 import { debouncedFilterGames } from "../js/config.js";
 
 // ----------------------------------------------------
@@ -8,7 +8,7 @@ import { debouncedFilterGames } from "../js/config.js";
 // ----------------------------------------------------
 
 /**
- * Renderiza o jogo de destaque na Hero Section (renderHighlight).
+ * Renderiza o jogo de destaque na Hero Section.
  * @param {Object} jogo - Objeto do jogo a ser destacado.
  */
 export function renderHighlight(jogo) {
@@ -28,7 +28,7 @@ export function renderHighlight(jogo) {
   const imageUrl = getGameImageUrl(jogo);
   highlightContainer.style.backgroundImage = `linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.8)), url('${imageUrl}')`;
 
-  // Formatação de preço (ajuste para o R$ brasileiro, se necessário)
+  // Formatação de preço
   const apiPrice = jogo.preco
     ? jogo.preco.toFixed(2).replace(".", ",")
     : "0,00";
@@ -83,9 +83,8 @@ export function renderGameCard(jogo) {
         </button>
     `;
 
-  // Anexa o listener de Add to Cart ao botão específico
   card.querySelector(".add-cart-btn").addEventListener("click", (e) => {
-    e.stopPropagation(); // Impede o clique no card (showDetails)
+    e.stopPropagation();
     addToCart(jogo.id);
   });
 
@@ -163,7 +162,6 @@ export function renderLoginState(isLoggedIn, userName = "Usuário") {
   if (!authButtons) return;
 
   if (isLoggedIn) {
-    // Estado de logado
     authButtons.innerHTML = `
             <span class="welcome-message">Olá, ${userName}!</span>
             <button class="btn btn-profile">
@@ -178,7 +176,6 @@ export function renderLoginState(isLoggedIn, userName = "Usuário") {
             </a>
         `;
   } else {
-    // Renderiza o estado de deslogado (botões Entrar/Cadastrar)
     authButtons.innerHTML = `
             <button class="btn btn-login" onclick="window.location.href='Login/login.html'">
                 <i class="fas fa-user"></i> Entrar
@@ -203,7 +200,6 @@ export function renderLoginState(isLoggedIn, userName = "Usuário") {
  * Deve ser exportada para uso no main.js.
  */
 export function handleSearchInput() {
-  // 🚨 FUNÇÃO AGORA EXPORTADA AQUI
   const searchInput = document.getElementById("searchInput");
   const searchSuggestionsContainer = document.getElementById(
     "searchSuggestionsContainer"

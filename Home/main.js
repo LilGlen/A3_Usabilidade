@@ -16,8 +16,7 @@ import {
 } from "./ui/render.js";
 import {
   setupCartEventListeners,
-  openCart, // Importa a função de UI para abrir o painel
-  updateCartCounter as updateUiCartCounter, // Atualiza o contador no DOM
+  updateCartCounter as updateUiCartCounter,
 } from "./ui/cartUI.js";
 
 /**
@@ -44,7 +43,7 @@ async function init() {
   renderLoginState(user.loggedIn, user.name);
 
   await updateApiCartCounter();
-  // 2. Configura os listeners, que agora ENCONTRAM o botão de logout
+  // 2. Configura os listeners
   setupGlobalEventListeners();
 }
 
@@ -53,39 +52,33 @@ async function init() {
  */
 function setupGlobalEventListeners() {
   // --- Elementos DOM ---
-  // const btnLogin = document.querySelector(".btn-login"); // Removido: Não é mais necessário para a lógica de logout.
   const cartLink = document.getElementById("cart-link");
   const checkoutButton = document.getElementById("checkout-button-id");
   const searchInput = document.getElementById("searchInput");
   const searchButton = document.getElementById("searchButton");
-
-  // NOVO: Elemento do botão de logout criado dinamicamente em render.js
   const logoutButton = document.getElementById("logoutButton");
 
-  // 1. Inicialização do Debounce para a busca (filterGames deve vir de src/api/games.js)
+  // 1. Inicialização do Debounce para a busca
   const debouncedFilterFn = debounce(() => filterGames(true), 500);
   setDebouncedFilterGames(debouncedFilterFn);
 
-  // 2. Botão de Logout (Implementação limpa e modular)
+  // 2. Botão de Logout
   if (logoutButton) {
     logoutButton.addEventListener("click", (e) => {
       e.preventDefault();
-      // Chama a função 'logout' do módulo auth.js.
-      // Esta função deve limpar o token e RECARREGAR/REDIRECIONAR a página.
       logout();
     });
   }
-  // NOTA: O clique nos botões "Entrar" e "Cadastrar" (quando deslogado)
-  // é tratado pelo atributo 'onclick' injetado diretamente em render.js.
+
 
   // 3. Link/Botão do Carrinho
   setupCartEventListeners(loadCartItems, startCheckout);
   window.globalRemoveFromCart = removeFromCart;
   window.globalStartCheckout = startCheckout;
 
-  // 4. Event Listeners para a busca (searchInput e searchButton)
+  // 4. Event Listeners para a busca
   if (searchButton) {
-    searchButton.addEventListener("click", () => filterGames(false)); // Busca imediata
+    searchButton.addEventListener("click", () => filterGames(false));
   }
 
   if (searchInput) {
@@ -96,7 +89,7 @@ function setupGlobalEventListeners() {
     searchInput.addEventListener("keypress", (e) => {
       if (e.key === "Enter") {
         e.preventDefault();
-        filterGames(false); // Busca imediata
+        filterGames(false);
       }
     });
   }
