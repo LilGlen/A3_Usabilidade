@@ -26,14 +26,10 @@ export function renderLoginState() {
   const token = getToken();
 
   if (token && !isGenericClientToken(token)) {
-    // Usuário autenticado (não genérico)
     btnLogin.innerHTML = `<i class="fas fa-sign-out-alt"></i> Sair`;
-    // O event listener para Sair deve ser anexado no main.js
     btnRegister.style.display = "none";
   } else {
-    // Usuário não autenticado ou usando token genérico
     btnLogin.innerHTML = `<i class="fas fa-user"></i> Entrar`;
-    // O event listener para Entrar deve ser anexado no main.js
     btnRegister.style.display = "inline-flex";
   }
 }
@@ -48,7 +44,6 @@ export function createGameCard(game, isDiscounted = false) {
   const card = document.createElement("div");
   card.classList.add("game-card");
 
-  // ... (Seu código de formatação e cálculo de preço permanece aqui) ...
   const originalPrice = game.preco || 0;
   const discountPercentage = 0.4;
   const finalPrice = isDiscounted
@@ -86,7 +81,6 @@ export function createGameCard(game, isDiscounted = false) {
 
   card.innerHTML = cardHtml;
 
-  // Anexa o evento de clique que chama a função de API importada!
   const cartButton = card.querySelector(".add-to-cart-btn");
   if (game.id) {
     cartButton.dataset.gameId = game.id;
@@ -95,7 +89,7 @@ export function createGameCard(game, isDiscounted = false) {
   cartButton.addEventListener("click", () => {
     const gameId = parseInt(cartButton.dataset.gameId);
     if (gameId) {
-      addToCart(gameId); // 🔑 Chama a função do módulo 'cart.js'
+      addToCart(gameId);
     } else {
       alert("ID do jogo não encontrado.");
     }
@@ -105,7 +99,7 @@ export function createGameCard(game, isDiscounted = false) {
 }
 
 /**
- * 🔑 NOVA FUNÇÃO: Renderiza os dados do jogo na seção Hero.
+ * Renderiza os dados do jogo na seção Hero.
  * @param {Object} game - O objeto do jogo a ser destacado.
  */
 export function renderHeroSection(game) {
@@ -114,24 +108,19 @@ export function renderHeroSection(game) {
   const heroSubtitle = document.getElementById("hero-subtitle");
   const heroBuyBtn = document.getElementById("hero-buy-btn");
 
-  // Caminho para a imagem de fallback da Hero Section, caso o jogo não tenha uma
-  const fallbackImage = "assets/placeholder-cybernight.jpg";
+  const fallbackImage = "../Home/assets/imgs/HalfLife_Alyx.jpg";
 
-  // Usa a imagem da API ou o fallback
   const imageUrl = game && game.imagemUrl ? game.imagemUrl : fallbackImage;
 
   if (heroSection) {
-    // 1. Imagem de Fundo (via CSS)
     heroSection.style.backgroundImage = `url('${imageUrl}')`;
   }
 
   if (game) {
-    // 2. Título e Subtítulo
     if (heroTitle) {
       heroTitle.textContent = game.nome || "Jogo em Destaque";
     }
     if (heroSubtitle) {
-      // Usamos a descrição como subtítulo (ajuste o campo se sua API tiver um campo melhor)
       heroSubtitle.textContent =
         game.descricao || "Um novo mundo aguarda você.";
     }
@@ -139,13 +128,11 @@ export function renderHeroSection(game) {
     // 3. Botão Comprar Agora
     if (heroBuyBtn) {
       heroBuyBtn.textContent = "COMPRAR AGORA";
-      // 🔑 Vincula o clique do botão à função de adicionar ao carrinho
       heroBuyBtn.onclick = () => {
         addToCart(game.id);
       };
     }
   } else {
-    // Fallback UI se nenhum jogo for buscado
     if (heroTitle) heroTitle.textContent = "CYBERNIGHT2077";
     if (heroSubtitle) heroSubtitle.textContent = "Open-World RPG Masterpiece";
     if (heroBuyBtn)

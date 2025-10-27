@@ -8,14 +8,13 @@ export const CLIENT_EMAIL = "cliente@avjd.com";
 export const CLIENT_PASSWORD = "cliente123";
 
 export let GENERIC_TOKEN_VALUE = null;
-export let allGames = []; // 🔑 NOVA: Armazena todos os jogos
-export let debouncedFilterGames = null; // 🔑 NOVA: Referência à função debounced
+export let allGames = [];
+export let debouncedFilterGames = null;
 
 export function setGenericToken(token) {
   GENERIC_TOKEN_VALUE = token;
 }
 
-// 🔑 NOVAS FUNÇÕES: Para gerenciar o estado global de jogos e debounce
 export function setAllGames(games) {
   allGames = games;
 }

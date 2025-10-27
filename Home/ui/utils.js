@@ -38,7 +38,7 @@ export function getGameImageUrl(jogo) {
     jogo.nome.replace(/[^a-zA-Z0-9\s]/g, "").replace(/\s/g, "_") + ".jpg";
 
 
-    
+  // Tentativa 2
   const fileBaseName = jogo.nome.replace(/[\:\-\.]/g, "").replace(/\s/g, "_");
 
   // Simplesmente retorna o nome normalizado para o caminho, esperando que o nome da API seja similar
@@ -53,5 +53,5 @@ export function getGameImageUrl(jogo) {
  */
 export function showDetails(jogoId) {
   
-  window.location.href = `../Jogo/jogo.html?id=${jogoId}`;
+  window.location.href = `../Jogo/index.html?id=${jogoId}`;
 }

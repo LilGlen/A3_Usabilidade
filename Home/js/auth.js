@@ -110,5 +110,5 @@ export function logout() {
   localStorage.removeItem(AUTH_TOKEN_KEY);
   localStorage.removeItem(USER_NAME_KEY); 
 
-  window.location.href = "../Login/login.html"; // Redireciona para a página de login
+  window.location.href = "../Login/index.html"; // Redireciona para a página de login
 }

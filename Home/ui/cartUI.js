@@ -1,7 +1,7 @@
 import { formatCurrency } from "../utils/helpers.js";
-import { removeFromCart } from "../js/cart.js";
-import { showAlertNotification } from "./notifications.js";
+import { removeFromCart, startCheckout } from "../js/cart.js";
 import { getGameImageUrl } from "../ui/utils.js";
+import { isGenericClientToken } from "../js/auth.js";
 
 const cartPanel = document.getElementById("cart-off-canvas");
 const cartItemsList = document.getElementById("cart-items-list");
@@ -21,7 +21,7 @@ export async function openCart(loadCartItemsFn) {
   // Adiciona uma classe ao body para evitar o scroll da página de fundo
   document.body.classList.add("cart-open");
 
-  // Chama a função de carregamento de dados (que está em cartAPI.js)
+  // Chama a função de carregamento de dados
   if (loadCartItemsFn) {
     await loadCartItemsFn();
   }
@@ -122,15 +122,12 @@ export function setupCartEventListeners(loadCartItemsFn) {
   const cartLink = document.getElementById("cart-link");
   const closeBtn = cartPanel.querySelector(".close-btn");
 
-  // Adiciona a função de remover ao objeto global window para que o onclick no HTML funcione
-  // Isso é uma solução de UI que interage com a API, mas fica no escopo da UI.
   window.globalRemoveFromCart = (jogoId) =>
     removeFromCart(jogoId, loadCartItemsFn);
 
   if (cartLink) {
     cartLink.addEventListener("click", (e) => {
       e.preventDefault();
-      // Passa a função de carregamento para ser chamada ao abrir
       openCart(loadCartItemsFn);
     });
   }
@@ -142,10 +139,7 @@ export function setupCartEventListeners(loadCartItemsFn) {
   const checkoutButton = document.getElementById("checkout-button-id");
   if (checkoutButton) {
     checkoutButton.addEventListener("click", () => {
-      showAlertNotification(
-        "Funcionalidade de Checkout ainda será implementada!",
-        "info"
-      );
+      startCheckout(isGenericClientToken);
     });
   }
 }
