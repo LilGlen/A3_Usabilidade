@@ -1,6 +1,6 @@
 import { getGameImageUrl, showDetails } from "./utils.js";
 import { addToCart } from "../js/cart.js";
-import { selectSuggestion } from "../js/games.js"; 
+import { selectSuggestion } from "../js/games.js";
 import { debouncedFilterGames } from "../js/config.js";
 
 // ----------------------------------------------------
@@ -163,24 +163,26 @@ export function renderLoginState(isLoggedIn, userName = "Usuário") {
 
   if (isLoggedIn) {
     authButtons.innerHTML = `
-            <span class="welcome-message">Olá, ${userName}!</span>
-            <button class="btn btn-profile">
-                <i class="fas fa-user-circle"></i> Meu Perfil
-            </button>
-            <button class="btn btn-logout" id="logoutButton">
-                <i class="fas fa-sign-out-alt"></i> Sair
-            </button> 
-            <a href="#" id="cart-link" class="btn cart-btn" aria-label="Carrinho de Compras">
-                <i class="fas fa-shopping-cart"></i>
-                <span id="cart-counter" class="cart-counter">0</span>
-            </a>
-        `;
+        <span class="welcome-message">Olá, ${userName}!</span>
+        
+        <a href="../Conta/index.html" class="btn btn-profile" id="profileButton">
+            <i class="fas fa-user-circle"></i> Meu Perfil
+        </a>
+        
+        <button class="btn btn-logout" id="logoutButton">
+            <i class="fas fa-sign-out-alt"></i> Sair
+        </button> 
+        <a href="#" id="cart-link" class="btn cart-btn" aria-label="Carrinho de Compras">
+            <i class="fas fa-shopping-cart"></i>
+            <span id="cart-counter" class="cart-counter">0</span>
+        </a>
+    `;
   } else {
     authButtons.innerHTML = `
-            <button class="btn btn-login" onclick="window.location.href='Login/login.html'">
+            <button class="btn btn-login" onclick="window.location.href='Login/index.html'">
                 <i class="fas fa-user"></i> Entrar
             </button>
-            <button class="btn btn-register" onclick="window.location.href='Login/register.html'">
+            <button class="btn btn-register" onclick="window.location.href='Login/index.html'">
                 <i class="fas fa-sign-in-alt"></i> Cadastrar
             </button>
             <a href="#" id="cart-link" class="btn cart-btn" aria-label="Carrinho de Compras">
