@@ -38,3 +38,15 @@ export async function loadTemplate(templatePath, elementSelector) {
     console.error("Falha ao carregar o template:", error);
   }
 }
+/**
+ * Busca o nome de um jogo no cache global usando seu ID.
+ * @param {number} id - O ID do jogo.
+ * @returns {string} O nome do jogo ou um fallback.
+ */
+export function getGameNameById(id) {
+  // Assumindo que window.gamesCache é um array de todos os jogos carregados
+  const game = window.gamesCache?.find((g) => g.id === id);
+
+  // Retorna o nome, ou o ID com um prefixo se não for encontrado.
+  return game ? game.nome : `Jogo ID ${id}`;
+}

@@ -1,5 +1,5 @@
-import { BASE_URL } from "./config.js"; // O BASE_URL deve ser definido no main.js
-import { getToken, clearToken, loginAndGetToken } from "./auth.js"; // O arquivo auth.js deve existir em src/api/
+import { BASE_URL } from "./config.js";
+import { getToken, clearToken, loginAndGetToken } from "./auth.js";
 import {
   showAlertNotification,
   showConfirmation,
@@ -7,7 +7,8 @@ import {
 import {
   renderCart,
   updateCartCounter as updateUiCartCounter,
-} from "../ui/cartUI.js"; // Funções de UI
+} from "../ui/cartUI.js";
+import { getGameNameById } from "./utils.js";
 
 // Variável para cache de todos os jogos, usada para "enriquecer" os itens do carrinho
 let allGamesCache = [];
@@ -26,15 +27,14 @@ export function setGamesCache(games) {
 // ----------------------------------------------------
 
 /**
- * Busca o carrinho ativo na API, cruza os IDs com o cache de jogos e renderiza a UI.
+ * Busca o carrinho ativo na API, cruza os IDs com o cache de jogos e renderiza.
  */
 export async function loadCartItems() {
   const token = getToken();
 
-  // Se não houver token, limpa a UI e o contador
   if (!token) {
-    renderCart([]); // Limpa a lista de itens
-    updateUiCartCounter(0); // Zera o contador
+    renderCart([]);
+    updateUiCartCounter(0);
     return;
   }
 
@@ -52,7 +52,6 @@ export async function loadCartItems() {
 
     if (!response.ok) {
       if (response.status === 401) {
-        // Logout automático em caso de token inválido/expirado
         clearToken();
         showAlertNotification(
           "Sua sessão expirou. Faça login novamente.",
@@ -101,7 +100,7 @@ export async function updateCartCounter() {
   const token = getToken();
 
   if (!token) {
-    updateUiCartCounter(0); // Chama a função de UI para zerar
+    updateUiCartCounter(0);
     return;
   }
 
@@ -116,18 +115,17 @@ export async function updateCartCounter() {
       if (response.status === 401) {
         clearToken();
       }
-      updateUiCartCounter(0); // Chama a função de UI para zerar
+      updateUiCartCounter(0);
       return;
     }
 
     const data = await response.json();
     const itemCount = data.carrinho?.itens?.length || 0;
 
-    // ✅ Chamar a função de UI: updateCartCounter (do ui/cartUI.js)
     updateUiCartCounter(itemCount);
   } catch (error) {
     console.error("Erro ao atualizar contador do carrinho:", error);
-    updateUiCartCounter(0); // Chama a função de UI para zerar
+    updateUiCartCounter(0);
   }
 }
 
@@ -151,7 +149,6 @@ export async function addToCart(jogoId) {
   }
 
   try {
-    // Assumindo que o endpoint para adicionar é /carrinho/item/{jogoId} ou similar
     const response = await fetch(`${BASE_URL}/carrinho/add`, {
       method: "POST",
       headers: {
@@ -164,12 +161,10 @@ export async function addToCart(jogoId) {
     if (response.ok) {
       await updateCartCounter();
       showAlertNotification("Jogo adicionado ao carrinho!", "success");
-
-      // ✅ REMOVEMOS showCart() aqui. O main.js/UI deve decidir abrir o carrinho
     } else {
       if (response.status === 401 || response.status === 403) {
         clearToken();
-        await loginAndGetToken(); // Tenta reautenticar
+        await loginAndGetToken();
         showAlertNotification(
           "Sua sessão expirou. Tentando reconectar...",
           "info"
@@ -205,8 +200,10 @@ export async function removeFromCart(jogoId) {
     return;
   }
 
+  const jogoNome = getGameNameById(jogoId);
+
   const confirmed = await showConfirmation(
-    `Tem certeza que deseja remover o jogo ID ${jogoId} do carrinho?`
+    `Tem certeza que deseja remover o jogo "${jogoNome}" do carrinho?`
   );
 
   if (!confirmed) {
@@ -225,7 +222,7 @@ export async function removeFromCart(jogoId) {
     });
 
     if (response.ok) {
-      await loadCartItems(); // Recarrega o carrinho para atualizar a UI (lista e total)
+      await loadCartItems();
       showAlertNotification(`Jogo removido com sucesso!`, "success");
     } else {
       const errorData = await response.json();

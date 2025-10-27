@@ -24,8 +24,8 @@ import {
  * Função principal para inicializar toda a aplicação.
  */
 async function init() {
-  await loadTemplate("src/templates/header.html", "header");
-  await loadTemplate("src/templates/footer.html", "footer");
+  await loadTemplate("Home/templates/header.html", "header");
+  await loadTemplate("Home/templates/footer.html", "footer");
 
   await loginAndGetToken();
 

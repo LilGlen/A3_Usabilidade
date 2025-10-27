@@ -22,25 +22,35 @@ import {
  */
 export async function fetchAllGames() {
   const token = getToken();
+  const headers = {}; // Inicializa o objeto de cabeçalhos
 
-  if (!token) {
-    console.error(
-      "Token de autenticação ausente. Não é possível buscar jogos."
-    );
-    return null;
+  // 🔑 CORREÇÃO PRINCIPAL: Adiciona o cabeçalho 'Authorization' APENAS SE o token existir.
+  // A requisição ocorrerá mesmo sem o token.
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
   }
+
+  // Opcional: Adiciona o cabeçalho Content-Type, que é boa prática
+  headers["Content-Type"] = "application/json";
 
   try {
     const url = `${GAME_ENDPOINT}`;
     const response = await fetch(url, {
       method: "GET",
-      headers: { Authorization: `Bearer ${token}` },
+      headers: headers, // Usa o objeto headers, que pode ou não conter Authorization
     });
 
     if (!response.ok) {
       if (response.status === 401 || response.status === 403) {
+        // Se a API retornar 401/403, significa que o token é obrigatório ou inválido.
+        // Limpamos o token e tentamos fazer login novamente.
+        console.warn("Token inválido ou expirado. Limpando token.");
         clearToken();
+
+        // 🚨 Opcional: Você pode querer forçar o login aqui ou apenas retornar null.
+        // Já que você está chamando essa função no init(), retornar null é mais seguro.
       }
+      // Se for 401/403 (e você limpou), ou outro erro (e.g., 500), ainda lançamos a falha.
       throw new Error("Falha ao buscar jogos. Status: " + response.status);
     }
 
@@ -94,7 +104,6 @@ export async function loadGames(games) {
 // ----------------------------------------------------
 // FUNÇÃO DE DISTRIBUIÇÃO E RENDERIZAÇÃO
 // ----------------------------------------------------
-
 
 /**
  * Distribui os jogos para as seções (Destaque, Promoções, Populares, etc.) e os renderiza.
