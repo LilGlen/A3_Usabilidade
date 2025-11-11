@@ -5,22 +5,13 @@ import { Badge } from "./ui/badge";
 import { useAPI } from "./useAPI";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
 import { Loader2 } from "lucide-react";
-// 🏆 CORREÇÃO: Importar todos os sub-componentes de Paginação
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationLink,
-  PaginationPrevious,
-  PaginationNext,
-  PaginationEllipsis,
-} from "./ui/Pagination";
+import { Pagination } from "../components/Pagination";
 
 interface HomePageProps {
   onNavigate: (page: PageType, data?: any) => void;
 }
 
-// Interface para o Jogo retornado pela API (Ajustada para o seu JSON)
+// Interface para o Jogo retornado pela API
 interface Game {
   nome: string;
   preco: number;
@@ -28,7 +19,7 @@ interface Game {
   ano: number;
   categoria: string;
   empresa_nome: string;
-  id?: number; // Opcional, será gerado como fallback
+  id?: number;
   desconto?: number | null; // Opcional, será assumido como 0
   fk_empresa?: number;
   fk_categoria?: number;
@@ -77,7 +68,7 @@ function GameCard({
       )}
 
       <ImageWithFallback
-        src={image}
+        gameName={title}
         alt={`Capa do ${title}`}
         className="w-full h-32 sm:h-40 object-cover"
       />
@@ -105,19 +96,19 @@ export function HomePage({ onNavigate }: HomePageProps) {
   const api = useAPI();
   const [games, setGames] = useState<Game[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
   const [pagination, setPagination] = useState({
     page: 1,
-    limit: 20,
+    limit: 12,
     total: 0,
     totalPages: 0,
     hasNext: false,
     hasPrevious: false,
   });
-  const [currentPage, setCurrentPage] = useState(1);
   const [error, setError] = useState<string | null>(null);
 
-  // 1. Função de carregamento corrigida para tratar a página e a paginação manual
-  const loadGames = async (page: number = 1) => {
+  // 1. Função de carregamento dos jogos
+  const loadGames = async (page: number) => {
     setIsLoading(true);
     setError(null);
 
@@ -131,7 +122,7 @@ export function HomePage({ onNavigate }: HomePageProps) {
       }
 
       let gameData: Game[] = [];
-      let apiPagination = null; // Para armazenar metadados da API
+      let apiPagination = null;
 
       // Trata a resposta
       if (Array.isArray(result)) {
@@ -146,162 +137,83 @@ export function HomePage({ onNavigate }: HomePageProps) {
       );
 
       if (validGames.length > 0) {
-        if (apiPagination) {
-          // A. Se a API retornou metadados de paginação (Estrutura Completa)
-          setGames(validGames); // A API já devolveu a fatia correta
+        if (apiPagination && apiPagination.total !== undefined) {
+          setGames(validGames);
           setPagination({
             page: apiPagination.page || page,
             limit: apiPagination.limit || limit,
-            total: apiPagination.total || validGames.length,
+            total: apiPagination.total,
             totalPages: apiPagination.totalPages || 1,
-            hasNext: apiPagination.hasNext || false,
-            hasPrevious: apiPagination.hasPrevious || false,
+            hasNext: apiPagination.hasNext ?? false,
+            hasPrevious: apiPagination.hasPrevious ?? false,
           });
         } else {
-          // B. Se a API não retornou metadados (OU retornou todos os jogos, o que causava o loop)
-          const total = validGames.length;
+          const total =
+            validGames.length > 0
+              ? validGames.length + (page - 1) * limit + 1
+              : 0; // Aproximação perigosa
           const totalPages = Math.ceil(total / limit) || 1;
-
-          // 🏆 FIX: Implementa Paginação Manual (fatiando o array)
-          const start = (page - 1) * limit;
-          const end = start + limit;
-          const gamesForPage = validGames.slice(start, end);
-
-          // CRUCIAL: Apenas os jogos da página atual são mostrados
-          setGames(gamesForPage);
-
-          // CRUCIAL: A paginação reflete a página solicitada
-          setPagination({
+          setGames(validGames);
+          setPagination((prev) => ({
+            ...prev,
             page: page,
             limit: limit,
-            total: total,
-            totalPages: totalPages,
-            hasNext: page < totalPages,
+            totalPages:
+              prev.totalPages > 1
+                ? prev.totalPages
+                : validGames.length < limit
+                ? page
+                : page + 1,
+            hasNext: validGames.length === limit,
             hasPrevious: page > 1,
-          });
+            // total: prev.total // Manter o total anterior ou forçar 0
+            total: prev.total > 0 ? prev.total : 999999, // Valor grande de fallback se API não dá o total
+          }));
         }
       } else {
+        // Sem jogos
         setError("Nenhum jogo encontrado na API.");
         setGames([]);
+        setPagination((prev) => ({
+          ...prev,
+          total: 0,
+          totalPages: 0,
+          page: 1,
+        }));
       }
     } catch (e) {
       console.error("Erro na API ao buscar jogos:", e);
       setError("Falha na conexão com o servidor. Tente novamente mais tarde.");
       setGames([]);
+      setPagination((prev) => ({ ...prev, total: 0, totalPages: 0, page: 1 }));
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    // A chamada só ocorre quando currentPage ou o objeto 'api' (estabilizado) muda
-    loadGames(currentPage);
+    // 🏆 Dispara o carregamento quando a página atual (pagination.page) muda
+    loadGames(pagination.page);
     // Rola para o topo ao mudar a página, para melhor UX
-    if (currentPage !== 1) {
+    if (pagination.page !== 1) {
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
-  }, [currentPage, api]);
+  }, [pagination.page, api, pagination.limit]);
 
-  // Função para mudar a página (Chama setCurrentPage, que dispara o useEffect)
+  // Função para mudar a página
   const handlePageChange = (page: number) => {
-    if (page >= 1 && page <= pagination.totalPages && page !== currentPage) {
-      setCurrentPage(page);
+    // Validação de segurança
+    if (page >= 1 && page !== pagination.page) {
+      // Muda a página dentro do objeto de paginação
+      setPagination((prev) => ({ ...prev, page }));
     }
   };
 
-  // Função helper para gerar os botões de página com reticências (Ellipsis)
-  const renderPageItems = () => {
-    const { totalPages, page } = pagination;
-    const items = [];
-    const maxPagesToShow = 5;
-
-    if (totalPages <= 1) return null; // Não renderiza nada se houver apenas 1 página
-
-    if (totalPages <= maxPagesToShow) {
-      // Mostra todos os botões se o total for pequeno
-      for (let i = 1; i <= totalPages; i++) {
-        items.push(
-          <PaginationItem key={i}>
-            <PaginationLink
-              isActive={i === page}
-              onClick={(e) => {
-                e.preventDefault();
-                handlePageChange(i);
-              }}
-              size="icon" // 🏆 CORREÇÃO: Adicionando a propriedade 'size' obrigatória
-            >
-              {i}
-            </PaginationLink>
-          </PaginationItem>
-        );
-      }
-    } else {
-      // Lógica para mostrar Ellipsis (...) em páginas com muitos resultados
-      const start = Math.max(2, page - 1);
-      const end = Math.min(totalPages - 1, page + 1);
-
-      items.push(
-        <PaginationItem key={1}>
-          <PaginationLink
-            isActive={page === 1}
-            onClick={(e) => {
-              e.preventDefault();
-              handlePageChange(1);
-            }}
-            size={"icon"}
-          >
-            1
-          </PaginationLink>
-        </PaginationItem>
-      );
-
-      if (start > 2) {
-        items.push(<PaginationEllipsis key="start-ellipsis" />);
-      }
-
-      for (let i = start; i <= end; i++) {
-        items.push(
-          <PaginationItem key={i}>
-            <PaginationLink
-              isActive={i === page}
-              onClick={(e) => {
-                e.preventDefault();
-                handlePageChange(i);
-              }}
-              size={"icon"}
-            >
-              {i}
-            </PaginationLink>
-          </PaginationItem>
-        );
-      }
-
-      if (end < totalPages - 1) {
-        items.push(<PaginationEllipsis key="end-ellipsis" />);
-      }
-
-      items.push(
-        <PaginationItem key={totalPages}>
-          <PaginationLink
-            isActive={page === totalPages}
-            onClick={(e) => {
-              e.preventDefault();
-              handlePageChange(totalPages);
-            }}
-            size={"icon"}
-          >
-            {totalPages}
-          </PaginationLink>
-        </PaginationItem>
-      );
-    }
-
-    return items;
-  };
-
-  // 2. PROCESSAMENTO DOS JOGOS (Permanece o mesmo)
+  // 2. PROCESSAMENTO DOS JOGOS
   const processedGames: GameCardProps[] = (games || []).map((game, index) => {
-    const gameId = game.id ?? index + 1;
+    // A chave única é essencial. Se o ID for undefined, use a combinação de índice e página.
+    const gameId =
+      game.id ?? (pagination.page - 1) * pagination.limit + index + 1;
     const originalPrice = game.preco || 0;
     const discount = game.desconto || 0;
     const discountedPrice = originalPrice - originalPrice * (discount / 100);
@@ -339,7 +251,7 @@ export function HomePage({ onNavigate }: HomePageProps) {
           <p className="text-red-500 font-bold mb-4">Erro de Carregamento:</p>
           <p className="text-gray-300">{error}</p>
           <Button
-            onClick={() => loadGames(currentPage)}
+            onClick={() => loadGames(pagination.page)}
             className="mt-6 bg-purple-600 hover:bg-purple-700"
           >
             Tentar Novamente
@@ -383,11 +295,16 @@ export function HomePage({ onNavigate }: HomePageProps) {
         {/* LISTAGEM PRINCIPAL DE JOGOS */}
         <section className="mb-12">
           <h2 className="text-white font-bold text-2xl mb-6 uppercase tracking-wide">
-            Todos os Jogos ({pagination.total})
+            Todos os Jogos (
+            {pagination.total === 999999
+              ? "Carregando Total"
+              : pagination.total}
+            )
           </h2>
           {processedGames.length > 0 ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
               {processedGames.map((game) => (
+                // ⚠️ CRUCIAL: usar o ID gerado/processado
                 <GameCard key={game.id} {...game} onNavigate={onNavigate} />
               ))}
             </div>
@@ -399,49 +316,17 @@ export function HomePage({ onNavigate }: HomePageProps) {
           )}
         </section>
 
-        {/* 🏆 CORREÇÃO: Implementação Completa da Paginação */}
+        {/* 🏆 IMPLEMENTAÇÃO FINAL: Seu componente customizado */}
         {pagination.totalPages > 1 && (
-          <section className="mb-12">
-            <Pagination className="mt-8">
-              <PaginationContent>
-                {/* Botão Anterior */}
-                <PaginationItem>
-                  <PaginationPrevious
-                    onClick={(e) => {
-                      e.preventDefault();
-                      handlePageChange(currentPage - 1);
-                    }}
-                    size={"icon"}
-                    aria-disabled={currentPage === 1}
-                    className={
-                      currentPage === 1
-                        ? "pointer-events-none opacity-50"
-                        : undefined
-                    }
-                  />
-                </PaginationItem>
-
-                {/* Botões de Página e Ellipsis (reticências) */}
-                {renderPageItems()}
-
-                {/* Botão Próximo */}
-                <PaginationItem>
-                  <PaginationNext
-                    onClick={(e) => {
-                      e.preventDefault();
-                      handlePageChange(currentPage + 1);
-                    }}
-                    size={"icon"}
-                    aria-disabled={currentPage === pagination.totalPages}
-                    className={
-                      currentPage === pagination.totalPages
-                        ? "pointer-events-none opacity-50"
-                        : undefined
-                    }
-                  />
-                </PaginationItem>
-              </PaginationContent>
-            </Pagination>
+          <section className="mb-12 flex justify-center">
+            <Pagination
+              currentPage={pagination.page}
+              totalPages={pagination.totalPages}
+              total={pagination.total}
+              limit={pagination.limit}
+              onPageChange={handlePageChange}
+              className="w-full md:w-3/4 max-w-4xl" // Adiciona classes de largura para centralizar
+            />
           </section>
         )}
       </div>
