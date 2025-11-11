@@ -1,76 +1,15 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>SYNTHX.COM</title>
-    <link rel="stylesheet" href="Home/styles/styles.css" />
-    <link rel="stylesheet" href="Home/styles/components.css" />
-    <link rel="stylesheet" href="Home/styles/utils.css" />
-    <link
-      rel="stylesheet"
-      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"
-    />
-  </head>
-  <body>
-    <header></header>
 
-    <main>
-      <section id="hero-section" class="hero-section">
-        <div class="hero-content"></div>
-      </section>
+  <!DOCTYPE html>
+  <html lang="en">
+    <head>
+      <meta charset="UTF-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <title>SYNTHX.COM</title>
+    </head>
 
-      <div id="mainStoreContent">
-        <section class="game-section">
-          <h3 class="section-title">PROMOTIONS</h3>
-          <div id="promotionsContainer" class="game-grid"></div>
-        </section>
-
-        <section class="game-section">
-          <h3 class="section-title">MOST POPULAR</h3>
-          <div id="popularContainer" class="game-grid"></div>
-        </section>
-
-        <section class="game-section">
-          <h3 class="section-title">NEW RELEASES</h3>
-          <div id="newReleasesContainer" class="game-grid"></div>
-        </section>
-      </div>
-
-      <div id="searchResultContainer" style="display: none">
-        <h3 class="section-title">Search Results</h3>
-        <div id="searchResultGrid" class="game-grid"></div>
-      </div>
-    </main>
-
-    <footer></footer>
-
-    <div id="cart-off-canvas" class="cart-panel">
-      <div class="cart-header">
-        <h4>Seu Carrinho</h4>
-        <button
-          class="close-btn"
-          onclick="document.getElementById('cart-off-canvas').classList.remove('open');"
-        >
-          <i class="fas fa-times"></i>
-        </button>
-      </div>
-      <div id="cart-items-list" class="cart-items">
-        <p>Seu carrinho está vazio.</p>
-      </div>
-      <div class="cart-summary">
-        <p>Total: <span id="cart-total">R$ 0,00</span></p>
-        <button id="checkout-button-id" class="btn btn-checkout">
-          Finalizar Compra
-        </button>
-      </div>
-    </div>
-
-    <div id="custom-notification" class="bottom-notification-bar">
-      <span id="notification-message"></span>
-      <div id="confirmation-actions"></div>
-    </div>
-
-    <script src="Home/main.js" type="module"></script>
-  </body>
-</html>
+    <body>
+      <div id="root"></div>
+      <script type="module" src="/src/main.tsx"></script>
+    </body>
+  </html>
+  
