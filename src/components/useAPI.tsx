@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { useAuth } from "./AuthContext";
 import { API_URL, GAME_ENDPOINT_PUBLIC } from "../types/api-endpoints";
 
@@ -11,7 +11,7 @@ interface RegisterData {
   nome: string;
   email: string;
   senha: string;
-  perfilId: number; // O Postman usa 'perfilId: 2' como default
+  perfilId: number;
 }
 
 interface LoginData {
@@ -26,18 +26,14 @@ interface ChangePasswordData {
 
 export function useAPI() {
   const { token } = useAuth();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // ❌ REMOVIDO: const [loading, setLoading] = useState(false);
+  // ❌ REMOVIDO: const [error, setError] = useState<string | null>(null);
 
   const makeRequest = useCallback(
     async <T,>(
       endpoint: string,
       options: RequestInit = {}
     ): Promise<T | null> => {
-      // ⚠️ IMPORTANTE: Não chamamos setLoading(true) ou setError(null) aqui.
-      // Essa responsabilidade é do componente (HomePage) para que ele controle seu próprio estado de loading,
-      // pois makeRequest é usado por múltiplas chamadas (login, getCompanies, etc.).
-
       try {
         const headers: Record<string, string> = {
           "Content-Type": "application/json",
@@ -60,15 +56,12 @@ export function useAPI() {
         // 2. Tenta processar o corpo da resposta
         let data: any;
         try {
-          // Clona a resposta para poder ler o corpo mais de uma vez em caso de debugging
           const responseClone = response.clone();
           data = await responseClone.json();
         } catch (e) {
-          // Se falhar ao ler JSON, mas o status é 204 (No Content), é sucesso.
           if (response.status === 204) {
-            return null as T; // Retorna null para requisições sem conteúdo (DELETE, por exemplo)
+            return null as T;
           }
-          // Se falhar ao ler JSON e o status não é 204, algo deu errado.
           data = null;
         }
 
@@ -79,13 +72,12 @@ export function useAPI() {
           if (data && (data as APIError).error) {
             errorMsg = (data as APIError).error;
           } else if (response.statusText) {
-            errorMsg = response.statusText; // Ex: Bad Request, Unauthorized
+            errorMsg = response.statusText;
           } else {
             errorMsg = `Erro HTTP ${response.status}`;
           }
 
-          // Define o estado de erro global
-          setError(errorMsg);
+          // Apenas loga o erro, o componente chamador lida com o retorno null
           console.error(
             "API Error:",
             errorMsg,
@@ -98,27 +90,15 @@ export function useAPI() {
         }
 
         // 4. Sucesso
-        setError(null);
         return data as T;
       } catch (err) {
-        // Erro de rede (Failed to fetch, Timeout, CORS). Este é o erro persistente.
+        // Erro de rede (Failed to fetch, Timeout, CORS).
         const errorMsg =
           err instanceof Error ? err.message : "Erro de rede desconhecido";
 
-        if (
-          errorMsg.includes("Failed to fetch") ||
-          errorMsg.includes("net::ERR_")
-        ) {
-          // Este é o cenário que estamos tentando diagnosticar.
-          setError(
-            "Não foi possível conectar ao servidor (Servidor offline ou configuração de rede/CORS incorreta)."
-          );
-          console.error("ERRO CRÍTICO DE CONEXÃO:", err, "URL Base:", API_URL);
-        } else {
-          setError(errorMsg);
-        }
+        console.error("ERRO CRÍTICO DE CONEXÃO OU REDE:", errorMsg, err);
 
-        console.error("Request error:", errorMsg, err);
+        // Retorna null em caso de erro de rede, o componente chamador trata.
         return null;
       }
     },
@@ -126,7 +106,7 @@ export function useAPI() {
   );
 
   // ----------------------------------------------------------------------
-  // 🔑 Auth (Autenticação) - NOVAS FUNÇÕES
+  // 🔑 Auth (Autenticação)
   // ----------------------------------------------------------------------
 
   const login = useCallback(
@@ -163,7 +143,7 @@ export function useAPI() {
   );
 
   // ----------------------------------------------------------------------
-  // 🏭 Empresas (Enterprise) - Rotas Corrigidas: /empresas
+  // 🏭 Empresas (Enterprise)
   // ----------------------------------------------------------------------
 
   const getCompanies = useCallback(
@@ -204,7 +184,7 @@ export function useAPI() {
   );
 
   // ----------------------------------------------------------------------
-  // 👤 Perfis (Profiles) - Rotas Corrigidas: /profiles
+  // 👤 Perfis (Profiles)
   // ----------------------------------------------------------------------
 
   const getProfiles = useCallback(
@@ -222,35 +202,30 @@ export function useAPI() {
   );
 
   // ----------------------------------------------------------------------
-  // 🎮 Jogos (Games) - /jogos
+  // 🎮 Jogos (Games) - 🏆 CORREÇÃO: Usando useCallback
   // ----------------------------------------------------------------------
 
-  async function getGames({ page = 1, limit = 20 }): Promise<any> {
-    // 1. Constrói os parâmetros de busca
-    const params = new URLSearchParams({
-      page: page.toString(),
-      limit: limit.toString(),
-    }).toString();
+  const getGames = useCallback(
+    async ({ page = 1, limit = 20 }): Promise<any> => {
+      // 1. Constrói os parâmetros de busca
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: limit.toString(),
+      }).toString();
 
-    // 2. Monta o endpoint. O makeRequest irá anexar API_URL.
-    // Confirme se GAME_ENDPOINT_PUBLIC é "/public/jogos"
-    const endpoint = `${GAME_ENDPOINT_PUBLIC}?${params}`;
+      // 2. Monta o endpoint. Usando a rota pública para listar jogos.
+      const endpoint = `${GAME_ENDPOINT_PUBLIC}?${params}`;
 
-    // 3. Realiza a requisição, esperando a estrutura de dados bruta da API.
-    // Se a API retornar um Array ou um Objeto, makeRequest trata.
-    const apiResult = await makeRequest<any>(endpoint, {
-      method: "GET",
-    });
+      // 3. Realiza a requisição
+      const apiResult = await makeRequest<any>(endpoint, {
+        method: "GET",
+      });
 
-    // makeRequest retorna 'null' se houver um erro de rede/API.
-    if (apiResult === null) {
-      // Retorna 'null' para que o HomePage possa tratar como erro/falha.
-      return null;
-    }
-
-    // 4. Retorna a resposta bruta (pode ser o array, ou {data, pagination})
-    return apiResult;
-  }
+      // makeRequest retorna 'null' se houver um erro de rede/API, o que o HomePage.tsx irá tratar.
+      return apiResult;
+    },
+    [makeRequest] // Depende apenas de makeRequest
+  );
 
   const getGame = useCallback(
     (id: string) =>
@@ -302,7 +277,7 @@ export function useAPI() {
   );
 
   // ----------------------------------------------------------------------
-  // 🛒 Carrinho (Cart) - Rotas Corrigidas: /carrinho
+  // 🛒 Carrinho (Cart)
   // ----------------------------------------------------------------------
 
   const getCart = useCallback(
@@ -319,7 +294,7 @@ export function useAPI() {
         alreadyInCart?: boolean;
       }>("/carrinho/add", {
         method: "POST",
-        body: JSON.stringify({ jogoId }), // Postman usa 'jogoId'
+        body: JSON.stringify({ jogoId }),
       }),
     [makeRequest]
   );
@@ -333,7 +308,7 @@ export function useAPI() {
   );
 
   // ----------------------------------------------------------------------
-  // 💰 Compras (Purchases) - Rotas Corrigidas: /vendas
+  // 💰 Compras (Purchases)
   // ----------------------------------------------------------------------
 
   const checkout = useCallback(
@@ -346,19 +321,19 @@ export function useAPI() {
   );
 
   const getPurchaseHistory = useCallback(
-    () => makeRequest<{ success: boolean; purchases: any[] }>("/vendas"), // Rota /vendas lista o histórico.
+    () => makeRequest<{ success: boolean; purchases: any[] }>("/vendas"),
     [makeRequest]
   );
 
   // ----------------------------------------------------------------------
-  // ⭐ Avaliações (Reviews) - Rotas Corrigidas: /avaliacoes
+  // ⭐ Avaliações (Reviews)
   // ----------------------------------------------------------------------
 
   const getGameReviews = useCallback(
     (jogoId: string) =>
       makeRequest<{ success: boolean; reviews: any[] }>(
         `/avaliacoes?jogoId=${jogoId}`
-      ), // List by Game usa query param
+      ),
     [makeRequest]
   );
 
@@ -366,7 +341,7 @@ export function useAPI() {
     (data: { jogoId: number; nota: number; comentario?: string }) =>
       makeRequest<{ success: boolean; review: any }>("/avaliacoes", {
         method: "POST",
-        body: JSON.stringify(data), // Postman usa 'jogoId', 'nota', 'comentario'
+        body: JSON.stringify(data),
       }),
     [makeRequest]
   );
@@ -394,7 +369,7 @@ export function useAPI() {
   );
 
   // ----------------------------------------------------------------------
-  // 📊 Relatórios (Reports) - Rotas Corrigidas: /relatorios
+  // 📊 Relatórios (Reports)
   // ----------------------------------------------------------------------
 
   const getTopGames = useCallback(
@@ -410,13 +385,13 @@ export function useAPI() {
       makeRequest<{ success: boolean; topGamesByCompany: any[] }>(
         `/relatorios/jogos-mais-vendidos?top=${top}${
           empresaId ? `&empresa=${empresaId}` : ""
-        }` // Usa 'empresa' query param
+        }`
       ),
     [makeRequest]
   );
 
   // ----------------------------------------------------------------------
-  // 👤 Usuários (Users) - Rotas Corrigidas: /usuarios
+  // 👤 Usuários (Users)
   // ----------------------------------------------------------------------
 
   const getUserById = useCallback(
@@ -426,7 +401,7 @@ export function useAPI() {
   );
 
   // ----------------------------------------------------------------------
-  // 💖 Lista de Desejos (Wishlist) - Rotas Corrigidas: /lista-desejo
+  // 💖 Lista de Desejos (Wishlist)
   // ----------------------------------------------------------------------
 
   const getWishlist = useCallback(
@@ -447,15 +422,14 @@ export function useAPI() {
     (jogoId: number) =>
       makeRequest<{ success: boolean; message: string }>("/lista-desejo", {
         method: "DELETE",
-        body: JSON.stringify({ jogoId }), // DELETE com body (JSON)
+        body: JSON.stringify({ jogoId }),
       }),
     [makeRequest]
   );
 
+  // Retorna todas as funções encapsuladas em useMemo para garantir que o objeto seja estável
   return useMemo(
     () => ({
-      loading,
-      error,
       // Autenticação
       login,
       register,
@@ -470,22 +444,35 @@ export function useAPI() {
       getProfiles,
       createProfile,
       // Jogos
-      getGames, // ⬅️ A função getGames é retornada aqui.
+      getGames, // Agora estável graças ao useCallback
       getGame,
       createGame,
       updateGame,
       deleteGame,
-      // ... (o resto das funções)
+      // Carrinho
+      getCart,
+      addToCart,
+      removeFromCart,
+      // Compras
+      checkout,
+      getPurchaseHistory,
+      // Avaliações
+      getGameReviews,
+      createReview,
+      updateReview,
+      getAllReviews,
+      getGameRatingAverage,
+      // Relatórios
+      getTopGames,
+      getTopGamesByCompany,
+      // Usuários
+      getUserById,
+      // Lista de Desejos
+      getWishlist,
+      addToWishlist,
+      removeFromWishlist,
     }),
     [
-      loading, // Dependência de estado
-      error, // Dependência de estado
-      // Inclua *todas* as funções de API que são dependentes de makeRequest
-      // e que, por sua vez, dependem do token, como login, getGames, etc.
-      // Como todas elas usam useCallback e makeRequest (que depende do token),
-      // só precisamos listar as que são de estado (loading, error)
-      // e as que são as funções callback, garantindo que o useMemo só seja reavaliado
-      // se algo nelas mudar.
       login,
       register,
       changePassword,
