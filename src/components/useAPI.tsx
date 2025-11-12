@@ -202,7 +202,7 @@ export function useAPI() {
   );
 
   // ----------------------------------------------------------------------
-  // 🎮 Jogos (Games) - 🏆 CORREÇÃO: Usando useCallback
+  // 🎮 Jogos (Games)
   // ----------------------------------------------------------------------
 
   const getGames = useCallback(
