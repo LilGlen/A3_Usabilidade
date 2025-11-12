@@ -7,11 +7,12 @@ import { ImageWithFallback } from "./figma/ImageWithFallback";
 import { Loader2 } from "lucide-react";
 import { Pagination } from "../components/Pagination";
 
-// 🏆 CONSTANTE DE PAGINAÇÃO: Define o número exato de itens por página.
+// CONSTANTE DE PAGINAÇÃO
 const ITEMS_PER_PAGE = 12;
 
 interface HomePageProps {
   onNavigate: (page: PageType, data?: any) => void;
+  searchTerm: string;
 }
 
 // Interface para o Jogo retornado pela API
@@ -70,7 +71,6 @@ function GameCard({
         </div>
       )}
 
-      {/* Cards com altura mais compacta */}
       <div className="w-full h-32 sm:h-40">
         <ImageWithFallback
           gameName={title}
@@ -100,12 +100,12 @@ function GameCard({
 
 export function HomePage({ onNavigate }: HomePageProps) {
   const api = useAPI();
-  // NOVO ESTADO: Armazena a lista COMPLETA de jogos retornada pela API
+  // Armazena a lista completa de jogos retornada pela API
   const [allGames, setAllGames] = useState<Game[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Estado de paginação, agora focado apenas na página atual
+  // Estado de paginação, focado apenas na página atual
   const [pagination, setPagination] = useState({
     page: 1,
     limit: ITEMS_PER_PAGE,
@@ -115,24 +115,19 @@ export function HomePage({ onNavigate }: HomePageProps) {
     hasPrevious: false,
   });
 
-  // 1. FUNÇÃO DE CARREGAMENTO (Chamada apenas UMA VEZ)
+  // 1. FUNÇÃO DE CARREGAMENTO
   const loadAllGames = async () => {
     setIsLoading(true);
     setError(null);
 
     try {
-      // Chamada à API sem parâmetros de paginação, esperando a lista completa
-      // Se a API retornar { data: [...], ...}, extraímos apenas 'data'.
       const result = await api.getGames({});
-
       let gameData: Game[] = [];
-
       if (Array.isArray(result)) {
-        gameData = result; // API retorna array direto
+        gameData = result;
       } else if (result && Array.isArray(result.data)) {
-        gameData = result.data; // API retorna { data: [...] }
+        gameData = result.data;
       } else if (result !== null) {
-        // Trata o caso de API retornar null ou um formato inesperado, mas não nulo.
         console.warn(
           "Formato de resposta inesperado da API, tratando como lista vazia."
         );
@@ -141,10 +136,7 @@ export function HomePage({ onNavigate }: HomePageProps) {
       const validGames = gameData.filter(
         (game) => game.nome && game.preco !== undefined && game.preco !== null
       );
-
-      setAllGames(validGames); // Armazena TODOS os jogos válidos
-
-      // Reseta a paginação para a página 1 após o carregamento inicial
+      setAllGames(validGames);
       setPagination((prev) => ({
         ...prev,
         page: 1,
@@ -166,18 +158,17 @@ export function HomePage({ onNavigate }: HomePageProps) {
   };
 
   // 2. EFEITO PARA CARREGAMENTO INICIAL
-  // Este useEffect carrega TODOS os jogos apenas uma vez (na montagem)
+  // Este useEffect carrega os jogos apenas uma vez
   useEffect(() => {
     loadAllGames();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 3. CÁLCULO DOS JOGOS DA PÁGINA ATUAL (MEMOIZATION)
+  // 3. CÁLCULO DOS JOGOS DA PÁGINA ATUAL
   const currentGames = useMemo(() => {
     const startIndex = (pagination.page - 1) * pagination.limit;
     const endIndex = startIndex + pagination.limit;
 
-    // Fatiamento (slice) para pegar APENAS os jogos da página atual
+    // Fatiamento para pegar os jogos da página atual
     return allGames.slice(startIndex, endIndex);
   }, [allGames, pagination.page, pagination.limit]); // Recalcula quando allGames ou a página mudam
 
@@ -194,7 +185,7 @@ export function HomePage({ onNavigate }: HomePageProps) {
     }
   };
 
-  // 4. PROCESSAMENTO DOS JOGOS (Mantido, mas usando currentGames)
+  // 4. PROCESSAMENTO DOS JOGOS
   const processedGames: GameCardProps[] = (currentGames || []).map(
     (game, index) => {
       const gameId =
@@ -202,7 +193,6 @@ export function HomePage({ onNavigate }: HomePageProps) {
       const originalPrice = game.preco || 0;
       const discount = game.desconto || 0;
       const discountedPrice = originalPrice - originalPrice * (discount / 100);
-
       return {
         id: gameId,
         title: game.nome,
@@ -239,7 +229,7 @@ export function HomePage({ onNavigate }: HomePageProps) {
 
   return (
     <div className="bg-main-bg min-h-screen">
-      {/* Hero Banner (ESTÁTICO) */}
+      {/* Hero Banner */}
       <section className="container mx-auto px-6 py-8">
         <div
           className="relative rounded-2xl overflow-hidden h-[300px] md:h-[400px] flex items-center justify-start"
@@ -274,7 +264,6 @@ export function HomePage({ onNavigate }: HomePageProps) {
             JOGOS EM DESTAQUE
           </h2>
           {processedGames.length > 0 ? (
-            // Layout de grid para renderizar os cards
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
               {processedGames.map((game) => (
                 <GameCard key={game.id} {...game} onNavigate={onNavigate} />
@@ -287,16 +276,13 @@ export function HomePage({ onNavigate }: HomePageProps) {
           )}
         </section>
 
-        {/* RODAPÉ E PAGINAÇÃO */}
-        {/* Garante que a Paginação só aparece se houver jogos */}
+        {/* PAGINAÇÃO */}
         {totalResults > 0 && (
           <div className="flex flex-col md:flex-row justify-between items-center mb-6 pt-4 space-y-4 md:space-y-0">
             <p className="text-secondary-text text-sm">
               Mostrando {startGameIndex} a {endGameIndex} de {totalResults}{" "}
               resultados
             </p>
-
-            {/* A Paginação só é renderizada se houver mais de uma página */}
             {pagination.totalPages > 1 && (
               <Pagination
                 currentPage={pagination.page}

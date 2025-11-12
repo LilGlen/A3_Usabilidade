@@ -23,10 +23,27 @@ export type PageType =
 export default function App() {
   const [currentPage, setCurrentPage] = useState<PageType>("home");
   const [pageData, setPageData] = useState<any>(null);
+
+  // Termo de Busca
+  const [searchTerm, setSearchTerm] = useState("");
+
   const navigateToPage = (page: PageType, data?: any) => {
     setCurrentPage(page);
     setPageData(data || null);
+
+    // Limpa a busca ao navegar para a maioria das páginas
+    if (page !== "home") {
+      setSearchTerm("");
+    }
     window.scrollTo(0, 0);
+  };
+
+  // NOVO HANDLER: Atualiza o estado da busca e garante que a home seja exibida
+  const handleSearchChange = (term: string) => {
+    setSearchTerm(term);
+    if (currentPage !== "home") {
+      setCurrentPage("home");
+    }
   };
 
   return (
@@ -37,6 +54,8 @@ export default function App() {
             currentPage={currentPage}
             pageData={pageData}
             navigateToPage={navigateToPage}
+            searchTerm={searchTerm}
+            onSearchChange={handleSearchChange}
           />
         </ToastProvider>
       </CartProvider>
@@ -48,10 +67,14 @@ function AppContent({
   currentPage,
   pageData,
   navigateToPage,
+  searchTerm,
+  onSearchChange,
 }: {
   currentPage: PageType;
   pageData: any;
   navigateToPage: (page: PageType, data?: any) => void;
+  searchTerm: string;
+  onSearchChange: (term: string) => void;
 }) {
   const { isAuthenticated, isLoading } = useAuth();
 
@@ -74,30 +97,25 @@ function AppContent({
   if (!isAuthenticated && !isPublicPage) {
     return <LandingPage />;
   }
-
-  // A partir daqui, o usuário está:
-  // 1. Autenticado (e pode ver qualquer página) OU
-  // 2. Não autenticado, mas está em uma página pública ("home" ou "details").
-
   return (
     <div
       className="min-h-screen bg-main-bg text-main-text"
       role="application"
       aria-label="SYNTHX - Loja de Jogos Digitais"
     >
-      <Header onNavigate={navigateToPage} />
-
+      {/* Passando o handler de busca para o Header */}
+      <Header onNavigate={navigateToPage} onSearchChange={onSearchChange} />
       <main role="main" aria-live="polite">
-        {/* HomePage e GameDetailsPageNew agora são acessíveis a todos */}
-        {currentPage === "home" && <HomePage onNavigate={navigateToPage} />}
+        {/* Passando o termo de busca para o HomePage */}
+        {currentPage === "home" && (
+          <HomePage onNavigate={navigateToPage} searchTerm={searchTerm} />
+        )}
         {currentPage === "details" && (
           <GameDetailsPageNew
             gameId={pageData?.gameId}
             onNavigate={navigateToPage}
           />
         )}
-        {/* As páginas abaixo só serão carregadas se isAuthenticated for true, 
-            graças ao check feito logo acima. */}
         {currentPage === "admin" && (
           <AdminPageComplete onNavigate={navigateToPage} />
         )}
@@ -111,7 +129,6 @@ function AppContent({
           <CheckoutPageNew onNavigate={navigateToPage} />
         )}
       </main>
-
       <Footer />
     </div>
   );
