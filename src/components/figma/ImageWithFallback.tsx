@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { GAME_ASSETS } from "../../assets/assets-map";
 
 // Placeholder para imagem não encontrada (SVG em Base64)
 const ERROR_IMG_SRC =
@@ -14,23 +15,25 @@ function getGameAssetPath(gameName: string): string {
   const nomeNormalizado = gameName
     .toLowerCase()
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9\s]/g, "")
-    .replace(/\s/g, "_");
+    .replace(/[\u0300-\u036f]/g, "") // Remove acentos
+    .replace(/[^a-z0-9\s-]/g, "") // Mantém letras, números, espaços e hífen (para Half-Life)
+    .replace(/\s/g, "_"); // Substitui espaços por _
 
-  // O caminho 'assets/' está no mesmo nível de 'components'.
-  const basePath = "../assets/";
+  // 2. Busca o ativo no mapa estático
+  const assetPath = GAME_ASSETS[nomeNormalizado as keyof typeof GAME_ASSETS];
 
-  
+  // DEBUG: Mostra o nome que o código está buscando e o resultado da busca
+  console.log(
+    `[DEBUG - ${gameName}] Nome Normalizado (Chave): ${nomeNormalizado}`
+  );
+  console.log(
+    `[DEBUG - ${gameName}] Caminho Resolvido: ${
+      assetPath || "Não Encontrado no Mapa"
+    }`
+  );
 
-  // Assumimos .jpg como o padrão para a primeira tentativa.
-  const assetPath = `${basePath}${nomeNormalizado}.jpg`;
-
-  // DEBUG 1: Mostra o nome que o código está buscando e o caminho construído
-  console.log(`[DEBUG - ${gameName}] Nome Normalizado: ${nomeNormalizado}`);
-  console.log(`[DEBUG - ${gameName}] Caminho Local Tentado: ${assetPath}`);
-
-  return assetPath;
+  // Se o ativo for encontrado no mapa, ele será a URL pública (string); caso contrário, será undefined.
+  return assetPath || ""; // Retorna a URL se existir, senão uma string vazia para forçar o fallback
 }
 
 // --- Componente de Imagem com Fallback ---
