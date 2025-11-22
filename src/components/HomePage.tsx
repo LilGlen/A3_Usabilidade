@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { PageType } from "../App";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
@@ -6,6 +6,9 @@ import { useAPI } from "./useAPI";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
 import { Loader2 } from "lucide-react";
 import { Pagination } from "../components/Pagination";
+import { useCart } from "./CartContext";
+import { useAuth } from "./AuthContext";
+import { useToast } from "./ToastProvider";
 
 // CONSTANTE DE PAGINAÇÃO
 const ITEMS_PER_PAGE = 12;
@@ -15,53 +18,65 @@ interface HomePageProps {
   searchTerm: string;
 }
 
-// Interface para o Jogo retornado pela API
-interface Game {
+// Game vindo da API pública (SEM ID)
+interface GamePublic {
   nome: string;
   preco: number;
   descricao: string;
   ano: number;
   categoria: string;
   empresa_nome: string;
-  id?: number;
-  desconto?: number | null; // Opcional, será assumido como 0
-  fk_empresa?: number;
-  fk_categoria?: number;
+  image?: string;
+}
+
+// Game privado (COM ID)
+interface GamePrivate {
+  id: number;
+  nome: string;
+  descricao: string;
+  preco: number;
+  ano: number;
+  fk_empresa: number;
+  fk_categoria: number;
+  desconto?: number;
   image?: string;
 }
 
 interface GameCardProps {
-  id: number;
   title: string;
   originalPrice: number;
   discountedPrice: number;
   discount: number;
   image: string;
-  onNavigate: (page: PageType, data?: any) => void;
+  onClick: () => void;
+  onAddToCart: () => Promise<void>;
 }
 
+// ---------- COMPONENTE CARD ----------
 function GameCard({
-  id,
   title,
   originalPrice,
   discountedPrice,
   discount,
   image,
-  onNavigate,
+  onClick,
+  onAddToCart,
 }: GameCardProps) {
+  const [isAdding, setIsAdding] = useState(false);
+
+  const handleAdd = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsAdding(true);
+    await onAddToCart();
+    setIsAdding(false);
+  };
+
   return (
     <div
-      className="bg-secondary-bg rounded-lg overflow-hidden cursor-pointer transition-all duration-300 hover:transform hover:scale-105 hover:shadow-lg relative"
-      onClick={() => onNavigate("details", { gameId: id })}
+      className="bg-secondary-bg rounded-lg overflow-hidden cursor-pointer 
+      transition-all duration-300 hover:transform hover:scale-105 hover:shadow-lg relative"
+      onClick={onClick}
       role="button"
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onNavigate("details", { gameId: id });
-        }
-      }}
-      aria-label={`Ver detalhes de ${title}`}
     >
       {discount > 0 && (
         <div className="absolute top-2 right-2 z-10">
@@ -83,7 +98,8 @@ function GameCard({
         <h3 className="text-main-text font-medium text-sm mb-2 truncate">
           {title}
         </h3>
-        <div className="flex flex-col space-y-1">
+
+        <div className="flex flex-col space-y-1 mb-4">
           {discount > 0 && (
             <p className="text-secondary-text line-through text-xs">
               R$ {originalPrice.toFixed(2)}
@@ -93,143 +109,189 @@ function GameCard({
             R$ {discountedPrice.toFixed(2)}
           </p>
         </div>
+
+        <Button
+          className="w-full bg-accent-purple hover:bg-accent-hover text-white py-2"
+          onClick={handleAdd}
+          disabled={isAdding}
+        >
+          {isAdding ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            "Adicionar ao Carrinho"
+          )}
+        </Button>
       </div>
     </div>
   );
 }
 
-export function HomePage({ onNavigate }: HomePageProps) {
+// ---------- HOME PAGE ----------
+export function HomePage({ onNavigate, searchTerm }: HomePageProps) {
   const api = useAPI();
-  // Armazena a lista completa de jogos retornada pela API
-  const [allGames, setAllGames] = useState<Game[]>([]);
+  const { addToCart } = useCart();
+  const { isAuthenticated } = useAuth();
+  const { showToast } = useToast();
+
+  const [gamesPublic, setGamesPublic] = useState<GamePublic[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Estado de paginação, focado apenas na página atual
   const [pagination, setPagination] = useState({
     page: 1,
     limit: ITEMS_PER_PAGE,
     total: 0,
     totalPages: 0,
-    hasNext: false,
-    hasPrevious: false,
   });
 
-  // 1. FUNÇÃO DE CARREGAMENTO
-  const loadAllGames = async () => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const result = await api.getGames({});
-      let gameData: Game[] = [];
-      if (Array.isArray(result)) {
-        gameData = result;
-      } else if (result && Array.isArray(result.data)) {
-        gameData = result.data;
-      } else if (result !== null) {
-        console.warn(
-          "Formato de resposta inesperado da API, tratando como lista vazia."
-        );
-      }
-
-      const validGames = gameData.filter(
-        (game) => game.nome && game.preco !== undefined && game.preco !== null
-      );
-      setAllGames(validGames);
-      setPagination((prev) => ({
-        ...prev,
-        page: 1,
-        total: validGames.length,
-        totalPages: Math.ceil(validGames.length / prev.limit),
-      }));
-
-      if (validGames.length === 0) {
-        setError("Nenhum jogo encontrado no catálogo.");
-      }
-    } catch (e) {
-      console.error("Erro na API ao buscar jogos:", e);
-      setError("Falha na conexão com o servidor. Tente novamente mais tarde.");
-      setAllGames([]);
-      setPagination((prev) => ({ ...prev, total: 0, totalPages: 0, page: 1 }));
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // 2. EFEITO PARA CARREGAMENTO INICIAL
-  // Este useEffect carrega os jogos apenas uma vez
+  // ---------- BUSCA DE JOGOS PÚBLICOS ----------
   useEffect(() => {
-    loadAllGames();
-  }, []);
+    const loadPublicGames = async () => {
+      setIsLoading(true);
+      setError(null);
 
-  // 3. CÁLCULO DOS JOGOS DA PÁGINA ATUAL
+      try {
+        const result = await api.getGames({});
+        const list: GamePublic[] = Array.isArray(result)
+          ? result
+          : result?.data ?? [];
+
+        const filtered = list.filter(
+          (game) =>
+            game.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            game.descricao.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+
+        setGamesPublic(filtered);
+        setPagination((prev) => ({
+          ...prev,
+          page: 1,
+          total: filtered.length,
+          totalPages: Math.ceil(filtered.length / prev.limit),
+        }));
+
+        if (filtered.length === 0) {
+          setError("Nenhum jogo encontrado.");
+        }
+      } catch {
+        setError("Falha ao conectar ao servidor.");
+        setGamesPublic([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadPublicGames();
+  }, [searchTerm]);
+
+  // ---------- PAGINAÇÃO ----------
   const currentGames = useMemo(() => {
-    const startIndex = (pagination.page - 1) * pagination.limit;
-    const endIndex = startIndex + pagination.limit;
+    const start = (pagination.page - 1) * pagination.limit;
+    const end = start + pagination.limit;
+    return gamesPublic.slice(start, end);
+  }, [gamesPublic, pagination]);
 
-    // Fatiamento para pegar os jogos da página atual
-    return allGames.slice(startIndex, endIndex);
-  }, [allGames, pagination.page, pagination.limit]); // Recalcula quando allGames ou a página mudam
-
-  // Função para mudar a página
   const handlePageChange = (page: number) => {
-    if (
-      page >= 1 &&
-      page <= pagination.totalPages &&
-      page !== pagination.page
-    ) {
+    if (page >= 1 && page <= pagination.totalPages) {
       setPagination((prev) => ({ ...prev, page }));
-      // Rola para o topo ao mudar a página, para melhor UX
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
   };
 
-  // 4. PROCESSAMENTO DOS JOGOS
-  const processedGames: GameCardProps[] = (currentGames || []).map(
-    (game, index) => {
-      const gameId =
-        game.id ?? (pagination.page - 1) * pagination.limit + index + 1;
-      const originalPrice = game.preco || 0;
-      const discount = game.desconto || 0;
-      const discountedPrice = originalPrice - originalPrice * (discount / 100);
-      return {
-        id: gameId,
-        title: game.nome,
-        originalPrice: originalPrice,
-        discountedPrice: discount > 0 ? discountedPrice : originalPrice,
-        discount: discount,
-        image:
-          game.image ||
-          `https://placehold.co/300x200/9146FF/ffffff?text=${encodeURIComponent(
-            game.nome
-          )}`,
-        onNavigate: onNavigate,
-      };
-    }
+  // ---------- OBTÉM O JOGO PRIVADO ----------
+  const findPrivateGameByName = async (
+    nome: string
+  ): Promise<GamePrivate | null> => {
+    const result = await api.getAllGames();
+    const list = result?.games || result;
+
+    return Array.isArray(list)
+      ? list.find((g) => g.nome.trim() === nome.trim()) ?? null
+      : null;
+  };
+
+  // ---------- CLIQUE NO CARD ----------
+  const handleCardClick = useCallback(
+    async (game: GamePublic) => {
+      if (!isAuthenticated) {
+        showToast({
+          type: "info",
+          title: "Login necessário",
+          message: "Você precisa estar logado para visualizar detalhes.",
+        });
+        return;
+      }
+
+      const found = await findPrivateGameByName(game.nome);
+      if (!found) {
+        showToast({
+          type: "error",
+          title: "Erro ao carregar detalhes",
+        });
+        return;
+      }
+
+      onNavigate("details", { gameId: found.id });
+    },
+    [isAuthenticated]
   );
 
+  // ---------- ADICIONAR AO CARRINHO ----------
+  const handleAddToCart = useCallback(
+    async (game: GamePublic) => {
+      if (!isAuthenticated) {
+        showToast({
+          type: "error",
+          title: "Login necessário",
+          message: "Faça login para adicionar itens ao carrinho.",
+        });
+        return;
+      }
+
+      const found = await findPrivateGameByName(game.nome);
+      if (!found) {
+        showToast({
+          type: "error",
+          title: "Erro ao identificar jogo",
+        });
+        return;
+      }
+
+      const result = await addToCart(found.id);
+
+      result
+        ? showToast({ type: "success", title: "Adicionado ao carrinho!" })
+        : showToast({ type: "error", title: "Erro ao adicionar ao carrinho" });
+    },
+    [isAuthenticated]
+  );
+
+  // ---------- PREPARA OS GAMES ----------
+  const processedGames = currentGames.map((game) => ({
+    title: game.nome,
+    originalPrice: game.preco,
+    discountedPrice: game.preco,
+    discount: 0,
+    image: game.image || "",
+    onClick: () => handleCardClick(game),
+    onAddToCart: () => handleAddToCart(game),
+  }));
+
+  // ---------- UI ----------
   if (isLoading) {
     return (
       <div className="bg-main-bg min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="w-12 h-12 text-accent-purple animate-spin mx-auto mb-4" />
-          <p className="text-secondary-text">Carregando catálogo completo...</p>
-        </div>
+        <Loader2 className="w-12 h-12 text-accent-purple animate-spin" />
       </div>
     );
   }
 
-  // 5. CÁLCULO DO RODAPÉ
   const defaultImageUrl =
     "https://images.unsplash.com/photo-1732631486925-8f7e9924f993?w=1200&h=600&fit=crop";
-  const startGameIndex = (pagination.page - 1) * pagination.limit + 1;
-  const endGameIndex = startGameIndex + processedGames.length - 1;
-  const totalResults = pagination.total;
 
   return (
     <div className="bg-main-bg min-h-screen">
-      {/* Hero Banner */}
+      {/* HERO */}
       <section className="container mx-auto px-6 py-8">
         <div
           className="relative rounded-2xl overflow-hidden h-[300px] md:h-[400px] flex items-center justify-start"
@@ -247,53 +309,36 @@ export function HomePage({ onNavigate }: HomePageProps) {
             <p className="text-gray-300 text-lg mb-6">
               Descubra os melhores jogos, de clássicos a lançamentos.
             </p>
-            <Button
-              className="bg-accent-purple hover:bg-accent-hover text-white font-bold py-3 px-8 rounded-full transition duration-300"
-              onClick={() => onNavigate("details")}
-            >
-              EXPLORAR JOGOS
-            </Button>
           </div>
         </div>
       </section>
 
+      {/* JOGOS */}
       <div className="container mx-auto px-6 pb-12">
-        {/* LISTAGEM PRINCIPAL DE JOGOS */}
         <section className="mb-12">
-          <h2 className="text-main-text font-bold text-2xl mb-6 uppercase tracking-wide">
+          <h2 className="text-main-text font-bold text-2xl mb-6">
             JOGOS EM DESTAQUE
           </h2>
+
           {processedGames.length > 0 ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
-              {processedGames.map((game) => (
-                <GameCard key={game.id} {...game} onNavigate={onNavigate} />
+              {processedGames.map((g, idx) => (
+                <GameCard key={idx} {...g} />
               ))}
             </div>
           ) : (
-            <p className="text-secondary-text">
-              {error || "Nenhum jogo encontrado no catálogo."}
-            </p>
+            <p className="text-secondary-text">{error}</p>
           )}
         </section>
 
-        {/* PAGINAÇÃO */}
-        {totalResults > 0 && (
-          <div className="flex flex-col md:flex-row justify-between items-center mb-6 pt-4 space-y-4 md:space-y-0">
-            <p className="text-secondary-text text-sm">
-              Mostrando {startGameIndex} a {endGameIndex} de {totalResults}{" "}
-              resultados
-            </p>
-            {pagination.totalPages > 1 && (
-              <Pagination
-                currentPage={pagination.page}
-                totalPages={pagination.totalPages}
-                total={totalResults}
-                limit={pagination.limit}
-                onPageChange={handlePageChange}
-                className="w-full md:w-auto"
-              />
-            )}
-          </div>
+        {pagination.totalPages > 1 && (
+          <Pagination
+            currentPage={pagination.page}
+            totalPages={pagination.totalPages}
+            total={pagination.total}
+            limit={pagination.limit}
+            onPageChange={handlePageChange}
+          />
         )}
       </div>
     </div>

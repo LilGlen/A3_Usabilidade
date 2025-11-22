@@ -1,4 +1,3 @@
-// Verifique se a porta 5000 está correta, caso contrário, use 3000 (padrão do Postman)
 export const API_URL = "http://localhost:5000/api/v1"; 
 
 // ==========================================================
@@ -6,41 +5,46 @@ export const API_URL = "http://localhost:5000/api/v1";
 // ==========================================================
 export const LOGIN_ENDPOINT = "/auth/login";
 export const REGISTER_ENDPOINT = "/auth/register";
-export const PROFILE_ENDPOINT = "/usuario/perfil"; // Exemplo: para buscar dados do perfil
+export const CHANGE_PASSWORD_ENDPOINT = "/auth/change-password";
+export const PROFILE_ENDPOINT = "/profiles";
 
 // ==========================================================
 // ENDPOINTS DE JOGOS E PRODUTOS
 // ==========================================================
+export const GAME_ENDPOINT_PUBLIC = "/public/jogos"; // (Postman: Game/All (public))
+export const GAME_ENDPOINT = "/jogos"; // (Postman: Game/All e Game/Create/Update/Delete - Base)
 
-// Rota de jogos pública
-export const GAME_ENDPOINT_PUBLIC = "/public/jogos";
-
-// Endpoint para buscar todos os jogos (com paginação/filtros)
-export const GAME_ENDPOINT = "/jogos"; 
-
-// Endpoint para buscar detalhes de um jogo específico (ex: /jogos/{id})
-export const GAME_DETAILS_BASE = "/jogos"; 
 
 // ==========================================================
-// ENDPOINTS DE CARRINHO E COMPRA
+// ENDPOINTS DE CARRINHO
 // ==========================================================
-// Endpoint para adicionar item ao carrinho (ou simplesmente /carrinho)
-export const CART_ADD_ENDPOINT = "/carrinho/adicionar"; 
-// Endpoint base para manipulação do carrinho (ex: GET, PUT, DELETE)
-export const CART_BASE_ENDPOINT = "/carrinho"; 
+export const CART_BASE_ENDPOINT = "/carrinho"; // (Postman: Cart/Show - GET)
+export const CART_ACTIVE_ENDPOINT = "/carrinho/ativo";
+export const CART_ADD_ENDPOINT = "/carrinho/add"; // (Postman: Cart/Add - POST)
 
 // ==========================================================
-// ENDPOINTS DE CHECKOUT E PEDIDOS
+// ENDPOINTS DE CHECKOUT E PEDIDOS/VENDAS
 // ==========================================================
-// Endpoint para finalizar a compra e criar um novo pedido
-export const CHECKOUT_ENDPOINT = "/pedidos";
-// Endpoint para listar os pedidos do usuário
-export const ORDERS_ENDPOINT = "/pedidos";
+export const CHECKOUT_ENDPOINT = "/vendas/checkout"; // (Postman: Purchases/Checkout)
+// CORREÇÃO: A coleção usa /vendas para histórico de pedidos (GET)
+export const ORDERS_ENDPOINT = "/vendas"; // (Postman: Purchases/History)
 
 // ==========================================================
-// ENDPOINTS DE ADMIN/GERENCIAMENTO (Exemplos)
+// ENDPOINTS DE CATEGORIAS, EMPRESAS E LISTA DE DESEJO
 // ==========================================================
+export const CATEGORIES_BASE_ENDPOINT = "/categorias";
+export const ENTERPRISE_BASE_ENDPOINT = "/empresas"; 
+export const WISHLIST_BASE_ENDPOINT = "/lista-desejo"; 
+
+// ==========================================================
+// ENDPOINTS DE AVALIAÇÃO (RATE)
+// ==========================================================
+export const RATE_BASE_ENDPOINT = "/avaliacoes"; 
+export const RATE_AVERAGE_ENDPOINT = "/avaliacoes/media"; 
+
+// ==========================================================
+// ENDPOINTS DE ADMIN/GERENCIAMENTO E RELATÓRIOS
+// ==========================================================
+export const MANAGEMENT_USERS_ENDPOINT = "/usuarios";
 export const MANAGEMENT_GAMES_ENDPOINT = "/admin/jogos";
-export const MANAGEMENT_USERS_ENDPOINT = "/admin/usuarios";
-export const REPORT_SALES_ENDPOINT = "/relatorios/vendas";
-
+export const REPORT_SALES_ENDPOINT = "/relatorios/jogos-mais-vendidos";

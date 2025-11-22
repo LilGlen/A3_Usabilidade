@@ -1,33 +1,49 @@
+// useAPI.tsx
 import { useCallback, useMemo } from "react";
 import { useAuth } from "./AuthContext";
-import { API_URL, GAME_ENDPOINT_PUBLIC } from "../types/api-endpoints";
+import {
+  API_URL,
+  GAME_ENDPOINT_PUBLIC,
+  GAME_ENDPOINT,
+  CART_BASE_ENDPOINT,
+  CART_ADD_ENDPOINT,
+  CART_ACTIVE_ENDPOINT,
+  WISHLIST_BASE_ENDPOINT,
+  RATE_BASE_ENDPOINT,
+} from "../types/api-endpoints";
 
-interface APIError {
-  error: string;
+// Tipos conforme backend REAL
+export interface CarrinhoItem {
+  id: number;
+  fkJogo: number;
+  fkCarrinho: number;
+  chave_ativacao?: string | null;
 }
 
-// Tipagens para os dados de autenticação
-interface RegisterData {
-  nome: string;
-  email: string;
-  senha: string;
-  perfilId: number;
+export interface Carrinho {
+  id: number;
+  fk_usuario: number;
+  fk_venda: number | null;
+  status: string;
+  itens: CarrinhoItem[];
 }
 
-interface LoginData {
-  email: string;
-  senha: string;
+export interface GetCartResponse {
+  message?: string;
+  carrinho?: Carrinho;
 }
 
-interface ChangePasswordData {
-  currentPassword: string;
-  newPassword: string;
+export interface AddToCartResponse {
+  message: string;
+  carrinho: Carrinho;
+}
+
+export interface RemoveFromCartResponse {
+  message: string;
 }
 
 export function useAPI() {
   const { token } = useAuth();
-  // ❌ REMOVIDO: const [loading, setLoading] = useState(false);
-  // ❌ REMOVIDO: const [error, setError] = useState<string | null>(null);
 
   const makeRequest = useCallback(
     async <T,>(
@@ -37,381 +53,114 @@ export function useAPI() {
       try {
         const headers: Record<string, string> = {
           "Content-Type": "application/json",
-          ...((options.headers as Record<string, string>) || {}),
+          ...(options.headers as Record<string, string>),
         };
 
-        // Lógica de Autorização
         if (token) {
           headers["Authorization"] = `Bearer ${token}`;
         }
 
-        const url = `${API_URL}${endpoint}`;
+        const normalizedEndpoint = endpoint.startsWith("/")
+          ? endpoint
+          : `/${endpoint}`;
+        const url = `${API_URL}${normalizedEndpoint}`;
 
-        // 1. Realiza a requisição
-        const response = await fetch(url, {
-          ...options,
-          headers,
-        });
+        const resp = await fetch(url, { ...options, headers });
 
-        // 2. Tenta processar o corpo da resposta
-        let data: any;
+        let data: any = null;
         try {
-          const responseClone = response.clone();
-          data = await responseClone.json();
-        } catch (e) {
-          if (response.status === 204) {
-            return null as T;
-          }
-          data = null;
+          data = await resp.clone().json();
+        } catch (_) {
+          if (resp.status === 204) return null;
         }
 
-        // 3. Trata a resposta HTTP (status code)
-        if (!response.ok) {
-          let errorMsg = "Erro na requisição";
-
-          if (data && (data as APIError).error) {
-            errorMsg = (data as APIError).error;
-          } else if (response.statusText) {
-            errorMsg = response.statusText;
-          } else {
-            errorMsg = `Erro HTTP ${response.status}`;
-          }
-
-          // Apenas loga o erro, o componente chamador lida com o retorno null
-          console.error(
-            "API Error:",
-            errorMsg,
-            "Status:",
-            response.status,
-            "URL:",
-            url
-          );
+        if (!resp.ok) {
+          // Log mais detalhado para debugging
+          console.error("API ERROR:", {
+            url,
+            status: resp.status,
+            body: data || resp.statusText,
+          });
           return null;
         }
 
-        // 4. Sucesso
         return data as T;
       } catch (err) {
-        // Erro de rede (Failed to fetch, Timeout, CORS).
-        const errorMsg =
-          err instanceof Error ? err.message : "Erro de rede desconhecido";
-
-        console.error("ERRO CRÍTICO DE CONEXÃO OU REDE:", errorMsg, err);
-
-        // Retorna null em caso de erro de rede, o componente chamador trata.
+        console.error("CONNECTION ERROR:", err);
         return null;
       }
     },
     [token]
   );
 
-  // ----------------------------------------------------------------------
-  // 🔑 Auth (Autenticação)
-  // ----------------------------------------------------------------------
-
-  const login = useCallback(
-    (data: LoginData) =>
-      makeRequest<{ success: boolean; token: string; user: any }>(
-        "/auth/login",
-        {
-          method: "POST",
-          body: JSON.stringify(data),
-        }
-      ),
+  // Retorna TODOS os jogos (rota privada, com ID)
+  const getAllGames = useCallback(
+    () => makeRequest<any>(GAME_ENDPOINT),
     [makeRequest]
   );
 
-  const register = useCallback(
-    (data: RegisterData) =>
-      makeRequest<{ success: boolean; user: any }>("/auth/register", {
-        method: "POST",
-        body: JSON.stringify(data),
-      }),
-    [makeRequest]
-  );
-
-  const changePassword = useCallback(
-    (data: ChangePasswordData) =>
-      makeRequest<{ success: boolean; message: string }>(
-        "/auth/change-password",
-        {
-          method: "PUT",
-          body: JSON.stringify(data),
-        }
-      ),
-    [makeRequest]
-  );
-
-  // ----------------------------------------------------------------------
-  // 🏭 Empresas (Enterprise)
-  // ----------------------------------------------------------------------
-
-  const getCompanies = useCallback(
-    () => makeRequest<{ success: boolean; companies: any[] }>("/empresas"),
-    [makeRequest]
-  );
-
-  const getCompany = useCallback(
-    (id: string) =>
-      makeRequest<{ success: boolean; company: any }>(`/empresas/${id}`),
-    [makeRequest]
-  );
-
-  const createCompany = useCallback(
-    (data: { nome: string }) =>
-      makeRequest<{ success: boolean; company: any }>("/empresas", {
-        method: "POST",
-        body: JSON.stringify(data),
-      }),
-    [makeRequest]
-  );
-
-  const updateCompany = useCallback(
-    (id: string, data: { nome: string }) =>
-      makeRequest<{ success: boolean; company: any }>(`/empresas/${id}`, {
-        method: "PUT",
-        body: JSON.stringify(data),
-      }),
-    [makeRequest]
-  );
-
-  const deleteCompany = useCallback(
-    (id: string) =>
-      makeRequest<{ success: boolean; message: string }>(`/empresas/${id}`, {
-        method: "DELETE",
-      }),
-    [makeRequest]
-  );
-
-  // ----------------------------------------------------------------------
-  // 👤 Perfis (Profiles)
-  // ----------------------------------------------------------------------
-
-  const getProfiles = useCallback(
-    () => makeRequest<{ success: boolean; profiles: any[] }>("/profiles"),
-    [makeRequest]
-  );
-
-  const createProfile = useCallback(
-    (data: { nome: string }) =>
-      makeRequest<{ success: boolean; profile: any }>("/profiles", {
-        method: "POST",
-        body: JSON.stringify(data),
-      }),
-    [makeRequest]
-  );
-
-  // ----------------------------------------------------------------------
-  // 🎮 Jogos (Games)
-  // ----------------------------------------------------------------------
-
+  // JOGOS
   const getGames = useCallback(
-    async ({ page = 1, limit = 20 }): Promise<any> => {
-      // 1. Constrói os parâmetros de busca
-      const params = new URLSearchParams({
-        page: page.toString(),
-        limit: limit.toString(),
-      }).toString();
-
-      // 2. Monta o endpoint. Usando a rota pública para listar jogos.
-      const endpoint = `${GAME_ENDPOINT_PUBLIC}?${params}`;
-
-      // 3. Realiza a requisição
-      const apiResult = await makeRequest<any>(endpoint, {
-        method: "GET",
-      });
-
-      // makeRequest retorna 'null' se houver um erro de rede/API, o que o HomePage.tsx irá tratar.
-      return apiResult;
-    },
-    [makeRequest] // Depende apenas de makeRequest
+    ({ page = 1, limit = 20 }) =>
+      makeRequest<any>(`${GAME_ENDPOINT_PUBLIC}?page=${page}&limit=${limit}`),
+    [makeRequest]
   );
 
+  // backend retorna: { jogo: {...} }
   const getGame = useCallback(
-    (id: string) =>
-      makeRequest<{ success: boolean; game: any }>(`/jogos/${id}`),
+    (id: string) => makeRequest<{ jogo: any }>(`${GAME_ENDPOINT}/${id}`),
     [makeRequest]
   );
 
-  const createGame = useCallback(
-    (data: {
-      nome: string;
-      descricao: string;
-      preco: number;
-      ano: number;
-      fkCategoria: number;
-      fkEmpresa: number;
-    }) =>
-      makeRequest<{ success: boolean; game: any }>("/jogos", {
-        method: "POST",
-        body: JSON.stringify(data),
-      }),
-    [makeRequest]
-  );
-
-  const updateGame = useCallback(
-    (
-      id: string,
-      data: {
-        nome?: string;
-        descricao?: string;
-        preco?: number;
-        ano?: number;
-        fkCategoria?: number;
-        fkEmpresa?: number;
-      }
-    ) =>
-      makeRequest<{ success: boolean; game: any }>(`/jogos/${id}`, {
-        method: "PUT",
-        body: JSON.stringify(data),
-      }),
-    [makeRequest]
-  );
-
-  const deleteGame = useCallback(
-    (id: string) =>
-      makeRequest<{ success: boolean; message: string }>(`/jogos/${id}`, {
-        method: "DELETE",
-      }),
-    [makeRequest]
-  );
-
-  // ----------------------------------------------------------------------
-  // 🛒 Carrinho (Cart)
-  // ----------------------------------------------------------------------
-
+  // CARRINHO
   const getCart = useCallback(
-    () => makeRequest<{ success: boolean; cart: any }>("/carrinho"),
+    () => makeRequest<GetCartResponse>(CART_ACTIVE_ENDPOINT),
     [makeRequest]
   );
 
   const addToCart = useCallback(
     (jogoId: number) =>
-      makeRequest<{
-        success: boolean;
-        cart?: any;
-        message?: string;
-        alreadyInCart?: boolean;
-      }>("/carrinho/add", {
+      makeRequest<AddToCartResponse>(CART_ADD_ENDPOINT, {
         method: "POST",
-        body: JSON.stringify({ jogoId }),
+        body: JSON.stringify({ jogoId, quantidade: 1 }),
       }),
     [makeRequest]
   );
 
   const removeFromCart = useCallback(
-    (gameId: string) =>
-      makeRequest<{ success: boolean; cart: any }>(`/carrinho/${gameId}`, {
+    (jogoId: number) =>
+      makeRequest<RemoveFromCartResponse>(`${CART_BASE_ENDPOINT}/${jogoId}`, {
         method: "DELETE",
       }),
     [makeRequest]
   );
 
-  // ----------------------------------------------------------------------
-  // 💰 Compras (Purchases)
-  // ----------------------------------------------------------------------
-
-  const checkout = useCallback(
-    (paymentMethod?: string) =>
-      makeRequest<{ success: boolean; purchase: any }>("/vendas/checkout", {
-        method: "POST",
-        body: JSON.stringify({ paymentMethod }),
-      }),
-    [makeRequest]
-  );
-
-  const getPurchaseHistory = useCallback(
-    () => makeRequest<{ success: boolean; purchases: any[] }>("/vendas"),
-    [makeRequest]
-  );
-
-  // ----------------------------------------------------------------------
-  // ⭐ Avaliações (Reviews)
-  // ----------------------------------------------------------------------
-
+  // AVALIAÇÕES
   const getGameReviews = useCallback(
     (jogoId: string) =>
-      makeRequest<{ success: boolean; reviews: any[] }>(
-        `/avaliacoes?jogoId=${jogoId}`
-      ),
+      makeRequest<{ reviews: any[] }>(`${RATE_BASE_ENDPOINT}?jogoId=${jogoId}`),
     [makeRequest]
   );
 
+  // POST { jogoId, nota, comentario }
   const createReview = useCallback(
     (data: { jogoId: number; nota: number; comentario?: string }) =>
-      makeRequest<{ success: boolean; review: any }>("/avaliacoes", {
+      makeRequest<{ review: any }>(RATE_BASE_ENDPOINT, {
         method: "POST",
         body: JSON.stringify(data),
       }),
     [makeRequest]
   );
 
-  const updateReview = useCallback(
-    (data: { jogoId: number; nota: number; comentario?: string }) =>
-      makeRequest<{ success: boolean; review: any }>("/avaliacoes", {
-        method: "PUT",
-        body: JSON.stringify(data),
-      }),
-    [makeRequest]
-  );
-
-  const getAllReviews = useCallback(
-    () => makeRequest<{ success: boolean; reviews: any[] }>("/avaliacoes"),
-    [makeRequest]
-  );
-
-  const getGameRatingAverage = useCallback(
-    (jogoId: string) =>
-      makeRequest<{ success: boolean; rating: number }>(
-        `/avaliacoes/media/${jogoId}`
-      ),
-    [makeRequest]
-  );
-
-  // ----------------------------------------------------------------------
-  // 📊 Relatórios (Reports)
-  // ----------------------------------------------------------------------
-
-  const getTopGames = useCallback(
-    (top: number = 5) =>
-      makeRequest<{ success: boolean; topGames: any[] }>(
-        `/relatorios/games-most-sell?top=${top}`
-      ),
-    [makeRequest]
-  );
-
-  const getTopGamesByCompany = useCallback(
-    (top: number = 5, empresaId?: string) =>
-      makeRequest<{ success: boolean; topGamesByCompany: any[] }>(
-        `/relatorios/jogos-mais-vendidos?top=${top}${
-          empresaId ? `&empresa=${empresaId}` : ""
-        }`
-      ),
-    [makeRequest]
-  );
-
-  // ----------------------------------------------------------------------
-  // 👤 Usuários (Users)
-  // ----------------------------------------------------------------------
-
-  const getUserById = useCallback(
-    (id: string) =>
-      makeRequest<{ success: boolean; user: any }>(`/usuarios/${id}`),
-    [makeRequest]
-  );
-
-  // ----------------------------------------------------------------------
-  // 💖 Lista de Desejos (Wishlist)
-  // ----------------------------------------------------------------------
-
+  // WISHLIST
   const getWishlist = useCallback(
-    () => makeRequest<{ success: boolean; wishlist: any[] }>("/lista-desejo"),
+    () => makeRequest<{ wishlist: any[] }>(WISHLIST_BASE_ENDPOINT),
     [makeRequest]
   );
 
   const addToWishlist = useCallback(
     (jogoId: number) =>
-      makeRequest<{ success: boolean; item: any }>("/lista-desejo", {
+      makeRequest<{ item: any }>(WISHLIST_BASE_ENDPOINT, {
         method: "POST",
         body: JSON.stringify({ jogoId }),
       }),
@@ -420,87 +169,42 @@ export function useAPI() {
 
   const removeFromWishlist = useCallback(
     (jogoId: number) =>
-      makeRequest<{ success: boolean; message: string }>("/lista-desejo", {
+      makeRequest<{ message: string }>(WISHLIST_BASE_ENDPOINT, {
         method: "DELETE",
         body: JSON.stringify({ jogoId }),
       }),
     [makeRequest]
   );
 
-  // Retorna todas as funções encapsuladas em useMemo para garantir que o objeto seja estável
   return useMemo(
     () => ({
-      // Autenticação
-      login,
-      register,
-      changePassword,
-      // Empresas
-      getCompanies,
-      getCompany,
-      createCompany,
-      updateCompany,
-      deleteCompany,
-      // Perfis (Profiles)
-      getProfiles,
-      createProfile,
-      // Jogos
-      getGames, // Agora estável graças ao useCallback
+      getGames,
       getGame,
-      createGame,
-      updateGame,
-      deleteGame,
-      // Carrinho
+      getAllGames,
+
       getCart,
       addToCart,
       removeFromCart,
-      // Compras
-      checkout,
-      getPurchaseHistory,
-      // Avaliações
+
       getGameReviews,
       createReview,
-      updateReview,
-      getAllReviews,
-      getGameRatingAverage,
-      // Relatórios
-      getTopGames,
-      getTopGamesByCompany,
-      // Usuários
-      getUserById,
-      // Lista de Desejos
+
       getWishlist,
       addToWishlist,
       removeFromWishlist,
     }),
     [
-      login,
-      register,
-      changePassword,
-      getCompanies,
-      getCompany,
-      createCompany,
-      updateCompany,
-      deleteCompany,
-      getProfiles,
-      createProfile,
       getGames,
       getGame,
-      createGame,
-      updateGame,
-      deleteGame,
+      getAllGames,
+
       getCart,
       addToCart,
       removeFromCart,
-      checkout,
-      getPurchaseHistory,
+
       getGameReviews,
       createReview,
-      updateReview,
-      getAllReviews,
-      getGameRatingAverage,
-      getTopGames,
-      getTopGamesByCompany,
-      getUserById,
+
       getWishlist,
       addToWishlist,
       removeFromWishlist,

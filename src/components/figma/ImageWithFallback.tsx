@@ -22,16 +22,6 @@ function getGameAssetPath(gameName: string): string {
   // 2. Busca o ativo no mapa estático
   const assetPath = GAME_ASSETS[nomeNormalizado as keyof typeof GAME_ASSETS];
 
-  // DEBUG: Mostra o nome que o código está buscando e o resultado da busca
-  console.log(
-    `[DEBUG - ${gameName}] Nome Normalizado (Chave): ${nomeNormalizado}`
-  );
-  console.log(
-    `[DEBUG - ${gameName}] Caminho Resolvido: ${
-      assetPath || "Não Encontrado no Mapa"
-    }`
-  );
-
   // Se o ativo for encontrado no mapa, ele será a URL pública (string); caso contrário, será undefined.
   return assetPath || ""; // Retorna a URL se existir, senão uma string vazia para forçar o fallback
 }

@@ -24,26 +24,20 @@ export default function App() {
   const [currentPage, setCurrentPage] = useState<PageType>("home");
   const [pageData, setPageData] = useState<any>(null);
 
-  // Termo de Busca
   const [searchTerm, setSearchTerm] = useState("");
 
   const navigateToPage = (page: PageType, data?: any) => {
     setCurrentPage(page);
     setPageData(data || null);
 
-    // Limpa a busca ao navegar para a maioria das páginas
-    if (page !== "home") {
-      setSearchTerm("");
-    }
+    if (page !== "home") setSearchTerm("");
+
     window.scrollTo(0, 0);
   };
 
-  // NOVO HANDLER: Atualiza o estado da busca e garante que a home seja exibida
   const handleSearchChange = (term: string) => {
     setSearchTerm(term);
-    if (currentPage !== "home") {
-      setCurrentPage("home");
-    }
+    if (currentPage !== "home") setCurrentPage("home");
   };
 
   return (
@@ -89,42 +83,40 @@ function AppContent({
     );
   }
 
-  // Define páginas públicas (que não precisam de login)
   const isPublicPage = currentPage === "home" || currentPage === "details";
 
-  // Se o usuário não estiver autenticado E tentar acessar uma página restrita,
-  // renderiza a LandingPage (tela de login/cadastro).
   if (!isAuthenticated && !isPublicPage) {
     return <LandingPage />;
   }
+
   return (
-    <div
-      className="min-h-screen bg-main-bg text-main-text"
-      role="application"
-      aria-label="SYNTHX - Loja de Jogos Digitais"
-    >
-      {/* Passando o handler de busca para o Header */}
+    <div className="min-h-screen bg-main-bg text-main-text">
       <Header onNavigate={navigateToPage} onSearchChange={onSearchChange} />
-      <main role="main" aria-live="polite">
-        {/* Passando o termo de busca para o HomePage */}
+
+      <main>
         {currentPage === "home" && (
           <HomePage onNavigate={navigateToPage} searchTerm={searchTerm} />
         )}
+
         {currentPage === "details" && (
           <GameDetailsPageNew
             gameId={pageData?.gameId}
             onNavigate={navigateToPage}
           />
         )}
+
         {currentPage === "admin" && (
           <AdminPageComplete onNavigate={navigateToPage} />
         )}
+
         {currentPage === "profile" && (
           <UserProfilePageNew onNavigate={navigateToPage} />
         )}
+
         {currentPage === "management" && (
           <ManagementPageNew onNavigate={navigateToPage} />
         )}
+
         {currentPage === "checkout" && (
           <CheckoutPageNew onNavigate={navigateToPage} />
         )}

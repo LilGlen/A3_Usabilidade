@@ -1,112 +1,103 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { useAPI } from './useAPI';
-import { useAuth } from './AuthContext';
-
-interface CartItem {
-  gameId: string;
-  addedAt: string;
-  gameDetails?: any;
-}
+// CartContext.tsx
+import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { useAPI, CarrinhoItem } from "./useAPI";
+import { useAuth } from "./AuthContext";
 
 interface CartContextType {
-  cart: CartItem[];
+  cart: CarrinhoItem[];
   cartCount: number;
   isLoading: boolean;
   refreshCart: () => Promise<void>;
-  addToCart: (gameId: string) => Promise<boolean | 'already-in-cart'>;
-  removeFromCart: (gameId: string) => Promise<boolean>;
-  clearCart: () => Promise<boolean>;
+  addToCart: (gameId: number) => Promise<boolean | "already-in-cart">;
+  removeFromCart: (gameId: number) => Promise<boolean>;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export function CartProvider({ children }: { children: ReactNode }) {
-  const [cart, setCart] = useState<CartItem[]>([]);
+  const [cart, setCart] = useState<CarrinhoItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const api = useAPI();
-  const { isAuthenticated } = useAuth();
 
+  const api = useAPI();
+  const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
+
+  // Carrega carrinho ao autenticar
   useEffect(() => {
-    if (isAuthenticated) {
-      refreshCart();
-    } else {
-      setCart([]);
+    if (!isAuthLoading) {
+      if (isAuthenticated) {
+        refreshCart();
+      } else {
+        setCart([]);
+      }
     }
-  }, [isAuthenticated]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, isAuthLoading]);
 
   const refreshCart = async () => {
     if (!isAuthenticated) {
       setCart([]);
       return;
     }
-    
+
     setIsLoading(true);
     try {
       const result = await api.getCart();
-      if (result?.success) {
-        setCart(result.cart?.items || []);
+      if (result?.carrinho?.itens) {
+        // itens já no formato do backend: fk_jogo, fk_carrinho...
+        setCart(result.carrinho.itens);
       } else {
-        console.warn('Failed to fetch cart, using empty cart');
         setCart([]);
       }
-    } catch (error) {
-      console.error('Error fetching cart:', error);
+    } catch (err) {
+      console.error("Erro ao obter carrinho:", err);
       setCart([]);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const addToCart = async (gameId: string): Promise<boolean | 'already-in-cart'> => {
-    if (!isAuthenticated) {
-      console.warn('Cannot add to cart: user not authenticated');
-      return false;
-    }
+  const addToCart = async (gameId: number): Promise<boolean | "already-in-cart"> => {
+    if (!isAuthenticated) return false;
+
+    // verificação local (usa fk_jogo conforme backend)
+    const already = cart.some((item) => item.fkJogo === gameId);
+    if (already) return "already-in-cart";
 
     try {
-      const result = await api.addToCart(gameId);
-      if (result?.success) {
-        await refreshCart();
+      const resp = await api.addToCart(gameId); // pode retornar AddToCartResponse | null
+
+      if (resp?.carrinho?.itens) {
+        setCart(resp.carrinho.itens);
         return true;
-      } else if (result?.alreadyInCart) {
-        // Game is already in cart, but this is not really an error
-        console.info('Game already in cart');
-        return 'already-in-cart' as any; // Return a special value
-      } else {
-        console.warn('Failed to add to cart:', result);
       }
-    } catch (error) {
-      console.error('Error adding to cart:', error);
+
+      // se backend avisou que já está no carrinho
+      if (resp?.message?.toLowerCase().includes("já está")) {
+        await refreshCart();
+        return "already-in-cart";
+      }
+
+      // fallback: tenta sincronizar e assume sucesso
+      await refreshCart();
+      return true;
+    } catch (err) {
+      console.error("Erro ao adicionar ao carrinho:", err);
+      return false;
     }
-    return false;
   };
 
-  const removeFromCart = async (gameId: string): Promise<boolean> => {
+  const removeFromCart = async (gameId: number): Promise<boolean> => {
     if (!isAuthenticated) return false;
 
     try {
       const result = await api.removeFromCart(gameId);
-      if (result?.success) {
+      if (result?.message) {
+        // sincroniza
         await refreshCart();
         return true;
       }
-    } catch (error) {
-      console.error('Error removing from cart:', error);
-    }
-    return false;
-  };
-
-  const clearCart = async (): Promise<boolean> => {
-    if (!isAuthenticated) return false;
-
-    try {
-      const result = await api.clearCart();
-      if (result?.success) {
-        setCart([]);
-        return true;
-      }
-    } catch (error) {
-      console.error('Error clearing cart:', error);
+    } catch (err) {
+      console.error("Erro ao remover do carrinho:", err);
     }
     return false;
   };
@@ -118,16 +109,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
     refreshCart,
     addToCart,
     removeFromCart,
-    clearCart
   };
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }
 
 export function useCart() {
-  const context = useContext(CartContext);
-  if (context === undefined) {
-    throw new Error('useCart must be used within a CartProvider');
-  }
-  return context;
+  const ctx = useContext(CartContext);
+  if (!ctx) throw new Error("useCart must be used within CartProvider");
+  return ctx;
 }

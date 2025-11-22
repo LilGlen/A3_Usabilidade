@@ -1,12 +1,23 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { projectId, publicAnonKey } from '../utils/supabase/info';
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode,
+} from "react";
+import { jwtDecode } from "jwt-decode";
 
-// User interface
+import {
+  API_URL,
+  LOGIN_ENDPOINT,
+  REGISTER_ENDPOINT,
+} from "../types/api-endpoints";
+
 interface User {
   id: string;
   name: string;
   email: string;
-  role: 'admin' | 'user';
+  role: "admin" | "user";
   joinDate: string;
 }
 
@@ -27,26 +38,45 @@ interface AuthContextType extends AuthState {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// API base URL
-const API_URL = `https://${projectId}.supabase.co/functions/v1/make-server-23051d03`;
+// 🔥 Agora compatível 100% com seu backend:
+// Perfis disponíveis:
+// • "Administrador"
+// • "Cliente"
+const mapProfileToRole = (perfil: string): "admin" | "user" => {
+  const p = perfil.toLowerCase();
 
-// Permission mappings based on roles
-const rolePermissions: Record<string, string[]> = {
+  if (p === "administrador") return "admin";
+  if (p === "cliente") return "user";
+
+  return "user"; // fallback seguro
+};
+
+// Permissões internas do front-end
+const rolePermissions: Record<"admin" | "user", string[]> = {
   admin: [
-    'manage_companies',
-    'manage_categories', 
-    'manage_games',
-    'view_reports',
-    'manage_users',
-    'purchase_games',
-    'review_games',
-    'view_purchase_history'
+    "manage_companies",
+    "manage_categories",
+    "manage_games",
+    "view_reports",
+    "manage_users",
+    "purchase_games",
+    "review_games",
+    "view_purchase_history",
   ],
-  user: [
-    'purchase_games',
-    'review_games',
-    'view_purchase_history'
-  ]
+  user: ["purchase_games", "review_games", "view_purchase_history"],
+};
+
+// Verifica expiração do JWT
+const isTokenExpired = (token: string): boolean => {
+  try {
+    const decoded: any = jwtDecode(token);
+    if (decoded.exp) {
+      return decoded.exp * 1000 < Date.now();
+    }
+    return false;
+  } catch {
+    return true;
+  }
 };
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -54,170 +84,147 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user: null,
     token: null,
     isAuthenticated: false,
-    permissions: []
+    permissions: [],
   });
+
   const [isLoading, setIsLoading] = useState(true);
-
-  // Check for existing session on mount
-  useEffect(() => {
-    const initAuth = async () => {
-      const savedToken = localStorage.getItem('synthx_token');
-      const savedUser = localStorage.getItem('synthx_user');
-      
-      if (savedToken && savedUser) {
-        try {
-          // Verify token with backend
-          const response = await fetch(`${API_URL}/auth/verify`, {
-            headers: {
-              'Authorization': `Bearer ${savedToken}`
-            }
-          });
-
-          if (response.ok) {
-            const data = await response.json();
-            const user = data.user;
-            const permissions = rolePermissions[user.role] || [];
-            
-            setAuthState({
-              user,
-              token: savedToken,
-              isAuthenticated: true,
-              permissions
-            });
-          } else {
-            // Token invalid, clear storage
-            localStorage.removeItem('synthx_token');
-            localStorage.removeItem('synthx_user');
-          }
-        } catch (error) {
-          console.error('Error verifying token:', error);
-          localStorage.removeItem('synthx_token');
-          localStorage.removeItem('synthx_user');
-        }
-      }
-      setIsLoading(false);
-    };
-
-    initAuth();
-  }, []);
-
-  const login = async (email: string, password: string): Promise<boolean> => {
-    try {
-      const response = await fetch(`${API_URL}/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${publicAnonKey}`
-        },
-        body: JSON.stringify({ email, password })
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        console.error('Login error:', error);
-        console.error('Status:', response.status);
-        console.error('%cDica: Execute o wizard de setup se for a primeira vez!', 'color: #9146FF; font-weight: bold;');
-        console.error('%cPara resetar: window.resetSetup()', 'color: #9146FF;');
-        return false;
-      }
-
-      const data = await response.json();
-      
-      if (data.success && data.token && data.user) {
-        const { token, user } = data;
-        const permissions = rolePermissions[user.role] || [];
-        
-        const newAuthState = {
-          user,
-          token,
-          isAuthenticated: true,
-          permissions
-        };
-        
-        setAuthState(newAuthState);
-        
-        // Persist session
-        localStorage.setItem('synthx_token', token);
-        localStorage.setItem('synthx_user', JSON.stringify(user));
-        
-        return true;
-      }
-      
-      return false;
-    } catch (error) {
-      console.error('Login error:', error);
-      return false;
-    }
-  };
-
-  const register = async (name: string, email: string, password: string): Promise<boolean> => {
-    try {
-      const response = await fetch(`${API_URL}/auth/signup`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${publicAnonKey}`
-        },
-        body: JSON.stringify({ name, email, password })
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        console.error('Signup error:', error);
-        return false;
-      }
-
-      const data = await response.json();
-      
-      if (data.success) {
-        // Auto login after registration
-        return await login(email, password);
-      }
-      
-      return false;
-    } catch (error) {
-      console.error('Signup error:', error);
-      return false;
-    }
-  };
 
   const logout = () => {
     setAuthState({
       user: null,
       token: null,
       isAuthenticated: false,
-      permissions: []
+      permissions: [],
     });
-    
-    // Clear persisted session
-    localStorage.removeItem('synthx_token');
-    localStorage.removeItem('synthx_user');
+    localStorage.removeItem("synthx_token");
+    localStorage.removeItem("synthx_user");
   };
 
-  const hasPermission = (permission: string): boolean => {
-    return authState.permissions.includes(permission);
+  const login = async (email: string, password: string): Promise<boolean> => {
+    setIsLoading(true);
+
+    try {
+      const url = `${API_URL}${LOGIN_ENDPOINT}`;
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, senha: password }),
+      });
+
+      if (!response.ok) return false;
+
+      const data = await response.json();
+      const token = data.token;
+
+      const decoded: any = jwtDecode(token);
+
+      // 🔥 CONVERSÃO correta do perfil vindo do backend
+      const role = mapProfileToRole(decoded.perfil);
+
+      const user: User = {
+        id: decoded.id.toString(),
+        name: decoded.nome,
+        email,
+        role,
+        joinDate: new Date().toISOString(),
+      };
+
+      setAuthState({
+        user,
+        token,
+        isAuthenticated: true,
+        permissions: rolePermissions[role],
+      });
+
+      localStorage.setItem("synthx_token", token);
+      localStorage.setItem("synthx_user", JSON.stringify(user));
+
+      return true;
+    } catch (err) {
+      console.error("LOGIN ERROR:", err);
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const value: AuthContextType = {
-    ...authState,
-    login,
-    register,
-    logout,
-    hasPermission,
-    isLoading
+  const register = async (
+    name: string,
+    email: string,
+    password: string
+  ): Promise<boolean> => {
+    setIsLoading(true);
+
+    try {
+      const url = `${API_URL}${REGISTER_ENDPOINT}`;
+
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nome: name,
+          email,
+          senha: password,
+          dataNascimento: "01/01/2000",
+        }),
+      });
+
+      if (!response.ok) return false;
+
+      // login automático
+      return await login(email, password);
+    } catch {
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
   };
+
+  const hasPermission = (permission: string) =>
+    authState.permissions.includes(permission);
+
+  // Carregamento inicial
+  useEffect(() => {
+    const savedToken = localStorage.getItem("synthx_token");
+    const savedUser = localStorage.getItem("synthx_user");
+
+    if (savedToken && savedUser) {
+      if (isTokenExpired(savedToken)) {
+        logout();
+      } else {
+        const user: User = JSON.parse(savedUser);
+        const permissions = rolePermissions[user.role];
+
+        setAuthState({
+          user,
+          token: savedToken,
+          isAuthenticated: true,
+          permissions,
+        });
+      }
+    }
+
+    setIsLoading(false);
+  }, []);
 
   return (
-    <AuthContext.Provider value={value}>
+    <AuthContext.Provider
+      value={{
+        ...authState,
+        login,
+        register,
+        logout,
+        hasPermission,
+        isLoading,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
 }
 
 export function useAuth() {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error("useAuth must be used inside AuthProvider");
+  return ctx;
 }
