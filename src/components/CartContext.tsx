@@ -65,38 +65,47 @@ export function CartProvider({ children }: { children: ReactNode }) {
   ): Promise<boolean | "already-in-cart" | string> => {
     if (!isAuthenticated) return false;
 
-    // verificação local (usa fk_jogo conforme backend)
     const already = cart.some((item) => item.fkJogo === gameId);
     if (already) return "already-in-cart";
 
     try {
       const resp = await api.addToCart(gameId);
 
-      // ❗ Caso o backend tenha retornado erro
-      if (resp && (resp as any).message) {
-        const msg = (resp as any).message.toLowerCase();
+      const msg: string = resp?.message?.toLowerCase() ?? "";
 
-        if (msg.includes("já está")) {
-          await refreshCart();
-          return "already-in-cart";
-        }
-
-        // retorna mensagem exata do backend
-        return (resp as any).message;
+      // --- ERROS REAIS VINDOS DO BACKEND ---
+      if (
+        msg.includes("erro") || // "Erro ao adicionar"
+        msg.includes("falha") || // "Falha ao adicionar"
+        msg.includes("não foi possível")
+      ) {
+        return false; // → tratado como ERROR no HomePage
       }
 
-      // Sucesso
-      if (resp?.carrinho?.itens) {
-        setCart(resp.carrinho.itens);
+      // --- JÁ ESTÁ NO CARRINHO ---
+      if (msg.includes("já está")) {
+        await refreshCart();
+        return "already-in-cart";
+      }
+
+      // --- SUCESSO COM MENSAGEM ---
+      if (resp?.message) {
+        await refreshCart();
         return true;
       }
 
-      // fallback
-      await refreshCart();
-      return true;
+      // --- SUCESSO PADRÃO ---
+      if (resp?.carrinho?.itens) {
+        setCart(resp.carrinho.itens);
+        await refreshCart();
+        return true;
+      }
+
+      // fallback — algo inesperado
+      return false;
     } catch (err) {
       console.error("Erro ao adicionar ao carrinho:", err);
-      return "Erro inesperado.";
+      return false;
     }
   };
 
@@ -107,6 +116,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       const result = await api.removeFromCart(gameId);
       if (result?.message) {
         await refreshCart();
+        window.location.reload(); // ⬅ ADICIONADO
         return true;
       }
     } catch (err) {

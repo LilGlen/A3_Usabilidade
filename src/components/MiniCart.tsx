@@ -6,8 +6,6 @@ import { PageType } from "../App";
 import { useCart } from "./CartContext";
 import { useAPI, CarrinhoItem } from "./useAPI";
 import { toast } from "sonner";
-
-// ⬇️ IMPORTAÇÃO DO ALERT DIALOG (como você pediu)
 import {
   AlertDialog,
   AlertDialogTrigger,
@@ -19,8 +17,6 @@ import {
   AlertDialogCancel,
   AlertDialogAction,
 } from "./ui/alert-dialog";
-
-// ⬇️ IMPORTAÇÃO DA IMAGEM COM FALLBACK
 import { ImageWithFallback } from "./figma/ImageWithFallback";
 
 interface MiniCartProps {
