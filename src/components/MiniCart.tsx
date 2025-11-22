@@ -1,5 +1,5 @@
 // MiniCart.tsx
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { X, Trash2, Loader2 } from "lucide-react";
 import { Button } from "./ui/button";
 import { PageType } from "../App";
@@ -43,7 +43,7 @@ export function MiniCart({ isOpen, onClose, onNavigate }: MiniCartProps) {
   const [loadingDetails, setLoadingDetails] = useState(false);
 
   // ================================================================
-  // ENRIQUECIMENTO DO CARRINHO COM DADOS DO JOGO REAL
+  // ENRIQUECIMENTO DO CARRINHO COM DADOS DOS JOGOS
   // ================================================================
   useEffect(() => {
     if (!isOpen) return;
@@ -54,31 +54,26 @@ export function MiniCart({ isOpen, onClose, onNavigate }: MiniCartProps) {
         setItems([]);
         return;
       }
-
       setLoadingDetails(true);
 
       try {
         const promises = cartItems.map(async (item: CarrinhoItem) => {
           const result = await api.getGame(String(item.fkJogo));
-
-          console.log("DEBUG – getGame(", item.fkJogo, "): ", result);
-
           const jogo = result?.jogo ?? result;
-          if (!jogo) return null;
 
+          if (!jogo) return null;
           return {
             id: item.id,
             fkJogo: item.fkJogo,
             game: {
               nome: jogo.nome,
               preco: jogo.preco,
-              imagem_url: jogo.nome, // ImageWithFallback usa o nome
+              imagem_url: jogo.nome,
             },
           };
         });
 
         const enriched = (await Promise.all(promises)).filter(Boolean) as EnrichedItem[];
-
         if (active) setItems(enriched);
       } catch (err) {
         console.error("Erro ao enriquecer itens do carrinho:", err);
@@ -87,24 +82,19 @@ export function MiniCart({ isOpen, onClose, onNavigate }: MiniCartProps) {
         setLoadingDetails(false);
       }
     }
-
     enrich();
-
     return () => {
       active = false;
     };
   }, [cartItems, isOpen, api]);
 
-  // ================================================================
-  // REMOVER DO CARRINHO (executado APÓS confirmação)
-  // ================================================================
+
   const confirmRemove = async (fk_jogo: number) => {
     const success = await removeFromCart(fk_jogo);
     success
       ? toast.success("Item removido do carrinho")
       : toast.error("Erro ao remover item");
   };
-
   const total = items.reduce((sum, it) => sum + (it.game.preco || 0), 0);
 
   if (!isOpen) return null;
@@ -146,7 +136,7 @@ export function MiniCart({ isOpen, onClose, onNavigate }: MiniCartProps) {
                   key={item.id}
                   className="flex items-center space-x-4 bg-main-bg rounded-lg p-4"
                 >
-                  {/* ⬇️ AGORA USA ImageWithFallback */}
+                  {/* ImageWithFallback */}
                   <ImageWithFallback
                     gameName={item.game.nome}
                     className="w-16 h-16 rounded-lg object-cover"

@@ -1,17 +1,6 @@
-import {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-  ReactNode,
-} from "react";
+import { createContext, useContext, useState, useEffect, ReactNode, } from "react";
 import { jwtDecode } from "jwt-decode";
-
-import {
-  API_URL,
-  LOGIN_ENDPOINT,
-  REGISTER_ENDPOINT,
-} from "../types/api-endpoints";
+import { API_URL, LOGIN_ENDPOINT, REGISTER_ENDPOINT, } from "../types/api-endpoints";
 
 interface User {
   id: string;
@@ -38,20 +27,13 @@ interface AuthContextType extends AuthState {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// 🔥 Agora compatível 100% com seu backend:
-// Perfis disponíveis:
-// • "Administrador"
-// • "Cliente"
 const mapProfileToRole = (perfil: string): "admin" | "user" => {
   const p = perfil.toLowerCase();
-
   if (p === "administrador") return "admin";
   if (p === "cliente") return "user";
-
-  return "user"; // fallback seguro
+  return "user"; 
 };
 
-// Permissões internas do front-end
 const rolePermissions: Record<"admin" | "user", string[]> = {
   admin: [
     "manage_companies",
@@ -66,7 +48,6 @@ const rolePermissions: Record<"admin" | "user", string[]> = {
   user: ["purchase_games", "review_games", "view_purchase_history"],
 };
 
-// Verifica expiração do JWT
 const isTokenExpired = (token: string): boolean => {
   try {
     const decoded: any = jwtDecode(token);
@@ -118,7 +99,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const decoded: any = jwtDecode(token);
 
-      // 🔥 CONVERSÃO correta do perfil vindo do backend
       const role = mapProfileToRole(decoded.perfil);
 
       const user: User = {
@@ -170,8 +150,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       if (!response.ok) return false;
-
-      // login automático
       return await login(email, password);
     } catch {
       return false;
@@ -183,7 +161,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const hasPermission = (permission: string) =>
     authState.permissions.includes(permission);
 
-  // Carregamento inicial
   useEffect(() => {
     const savedToken = localStorage.getItem("synthx_token");
     const savedUser = localStorage.getItem("synthx_user");

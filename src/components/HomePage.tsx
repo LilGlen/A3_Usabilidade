@@ -10,7 +10,6 @@ import { useCart } from "./CartContext";
 import { useAuth } from "./AuthContext";
 import { useToast } from "./ToastProvider";
 
-// CONSTANTE DE PAGINAÇÃO
 const ITEMS_PER_PAGE = 12;
 
 interface HomePageProps {
@@ -18,7 +17,6 @@ interface HomePageProps {
   searchTerm: string;
 }
 
-// Game vindo da API pública (SEM ID)
 interface GamePublic {
   nome: string;
   preco: number;
@@ -29,7 +27,6 @@ interface GamePublic {
   image?: string;
 }
 
-// Game privado (COM ID)
 interface GamePrivate {
   id: number;
   nome: string;
@@ -52,13 +49,11 @@ interface GameCardProps {
   onAddToCart: () => Promise<void>;
 }
 
-// ---------- COMPONENTE CARD ----------
 function GameCard({
   title,
   originalPrice,
   discountedPrice,
   discount,
-  image,
   onClick,
   onAddToCart,
 }: GameCardProps) {

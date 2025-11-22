@@ -1,11 +1,4 @@
-// CartContext.tsx
-import React, {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-  ReactNode,
-} from "react";
+import{ createContext, useContext, useState, useEffect, ReactNode, } from "react";
 import { useAPI, CarrinhoItem } from "./useAPI";
 import { useAuth } from "./AuthContext";
 
@@ -27,7 +20,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const api = useAPI();
   const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
 
-  // Carrega carrinho ao autenticar
   useEffect(() => {
     if (!isAuthLoading) {
       if (isAuthenticated) {
@@ -70,38 +62,30 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
     try {
       const resp = await api.addToCart(gameId);
-
       const msg: string = resp?.message?.toLowerCase() ?? "";
-
-      // --- ERROS REAIS VINDOS DO BACKEND ---
       if (
-        msg.includes("erro") || // "Erro ao adicionar"
-        msg.includes("falha") || // "Falha ao adicionar"
+        msg.includes("erro") ||
+        msg.includes("falha") ||
         msg.includes("não foi possível")
       ) {
-        return false; // → tratado como ERROR no HomePage
+        return false;
       }
 
-      // --- JÁ ESTÁ NO CARRINHO ---
       if (msg.includes("já está")) {
         await refreshCart();
         return "already-in-cart";
       }
 
-      // --- SUCESSO COM MENSAGEM ---
       if (resp?.message) {
         await refreshCart();
         return true;
       }
 
-      // --- SUCESSO PADRÃO ---
       if (resp?.carrinho?.itens) {
         setCart(resp.carrinho.itens);
         await refreshCart();
         return true;
       }
-
-      // fallback — algo inesperado
       return false;
     } catch (err) {
       console.error("Erro ao adicionar ao carrinho:", err);
@@ -116,7 +100,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       const result = await api.removeFromCart(gameId);
       if (result?.message) {
         await refreshCart();
-        window.location.reload(); // ⬅ ADICIONADO
+        window.location.reload();
         return true;
       }
     } catch (err) {

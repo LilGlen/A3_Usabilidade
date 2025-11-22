@@ -1,4 +1,3 @@
-// useAPI.tsx
 import { useCallback, useMemo } from "react";
 import { useAuth } from "./AuthContext";
 import {
@@ -12,7 +11,6 @@ import {
   RATE_BASE_ENDPOINT,
 } from "../types/api-endpoints";
 
-// Tipos conforme backend REAL
 export interface CarrinhoItem {
   id: number;
   fkJogo: number;
@@ -67,7 +65,6 @@ export function useAPI() {
 
         const resp = await fetch(url, { ...options, headers });
 
-        // tenta pegar JSON SEMPRE
         let data: any = null;
         try {
           data = await resp.clone().json();
@@ -75,27 +72,21 @@ export function useAPI() {
           if (resp.status === 204) return null;
         }
 
-        // --- CORREÇÃO MAIOR: não retornar null em erros ---
         if (!resp.ok) {
           console.error("API ERROR:", { url, status: resp.status, body: data });
 
-          // se backend retornar mensagem, devolvemos ela ao chamador
           if (data?.message) {
             return data as T;
           }
-
           throw { status: resp.status, body: data };
         }
-
         return data as T;
       } catch (err: any) {
         console.error("CONNECTION ERROR:", err);
 
-        // se o erro tiver mensagem do backend, retorne ela
         if (err?.body?.message) {
           return err.body as T;
         }
-
         return null;
       }
     },
@@ -108,25 +99,26 @@ export function useAPI() {
     [makeRequest]
   );
 
-  // JOGOS
+  // Retorna TODOS os jogos (rota pública, sem ID)
   const getGames = useCallback(
     ({ page = 1, limit = 20 }) =>
       makeRequest<any>(`${GAME_ENDPOINT_PUBLIC}?page=${page}&limit=${limit}`),
     [makeRequest]
   );
 
-  // backend retorna: { jogo: {...} }
+  // Retorna jogo por ID
   const getGame = useCallback(
     (id: string) => makeRequest<{ jogo: any }>(`${GAME_ENDPOINT}/${id}`),
     [makeRequest]
   );
 
-  // CARRINHO
+  // CARRINHO ATIVO
   const getCart = useCallback(
     () => makeRequest<GetCartResponse>(CART_ACTIVE_ENDPOINT),
     [makeRequest]
   );
 
+  //ADICIONAR AO CARRINHO
   const addToCart = useCallback(
     (jogoId: number) =>
       makeRequest<AddToCartResponse>(CART_ADD_ENDPOINT, {
@@ -136,6 +128,7 @@ export function useAPI() {
     [makeRequest]
   );
 
+  //REMOVER DO CARRINHO
   const removeFromCart = useCallback(
     (jogoId: number) =>
       makeRequest<RemoveFromCartResponse>(`${CART_BASE_ENDPOINT}/${jogoId}`, {
@@ -144,14 +137,14 @@ export function useAPI() {
     [makeRequest]
   );
 
-  // AVALIAÇÕES
+  // GET AVALIAÇÕES
   const getGameReviews = useCallback(
     (jogoId: string) =>
       makeRequest<{ reviews: any[] }>(`${RATE_BASE_ENDPOINT}?jogoId=${jogoId}`),
     [makeRequest]
   );
 
-  // POST { jogoId, nota, comentario }
+  // POST AVALIAÇÕES
   const createReview = useCallback(
     (data: { jogoId: number; nota: number; comentario?: string }) =>
       makeRequest<{ review: any }>(RATE_BASE_ENDPOINT, {
@@ -161,12 +154,13 @@ export function useAPI() {
     [makeRequest]
   );
 
-  // WISHLIST
+  // GET WISHLIST
   const getWishlist = useCallback(
     () => makeRequest<{ wishlist: any[] }>(WISHLIST_BASE_ENDPOINT),
     [makeRequest]
   );
 
+  // POST WISHLIST
   const addToWishlist = useCallback(
     (jogoId: number) =>
       makeRequest<{ item: any }>(WISHLIST_BASE_ENDPOINT, {
@@ -176,6 +170,7 @@ export function useAPI() {
     [makeRequest]
   );
 
+  //DELETE FROM WISHLIST
   const removeFromWishlist = useCallback(
     (jogoId: number) =>
       makeRequest<{ message: string }>(WISHLIST_BASE_ENDPOINT, {
