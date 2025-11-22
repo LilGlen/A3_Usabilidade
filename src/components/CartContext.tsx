@@ -1,5 +1,11 @@
 // CartContext.tsx
-import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode,
+} from "react";
 import { useAPI, CarrinhoItem } from "./useAPI";
 import { useAuth } from "./AuthContext";
 
@@ -8,7 +14,7 @@ interface CartContextType {
   cartCount: number;
   isLoading: boolean;
   refreshCart: () => Promise<void>;
-  addToCart: (gameId: number) => Promise<boolean | "already-in-cart">;
+  addToCart: (gameId: number) => Promise<boolean | "already-in-cart" | string>;
   removeFromCart: (gameId: number) => Promise<boolean>;
 }
 
@@ -30,7 +36,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
         setCart([]);
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, isAuthLoading]);
 
   const refreshCart = async () => {
@@ -43,7 +48,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
     try {
       const result = await api.getCart();
       if (result?.carrinho?.itens) {
-        // itens já no formato do backend: fk_jogo, fk_carrinho...
         setCart(result.carrinho.itens);
       } else {
         setCart([]);
@@ -56,7 +60,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const addToCart = async (gameId: number): Promise<boolean | "already-in-cart"> => {
+  const addToCart = async (
+    gameId: number
+  ): Promise<boolean | "already-in-cart" | string> => {
     if (!isAuthenticated) return false;
 
     // verificação local (usa fk_jogo conforme backend)
@@ -64,25 +70,33 @@ export function CartProvider({ children }: { children: ReactNode }) {
     if (already) return "already-in-cart";
 
     try {
-      const resp = await api.addToCart(gameId); // pode retornar AddToCartResponse | null
+      const resp = await api.addToCart(gameId);
 
+      // ❗ Caso o backend tenha retornado erro
+      if (resp && (resp as any).message) {
+        const msg = (resp as any).message.toLowerCase();
+
+        if (msg.includes("já está")) {
+          await refreshCart();
+          return "already-in-cart";
+        }
+
+        // retorna mensagem exata do backend
+        return (resp as any).message;
+      }
+
+      // Sucesso
       if (resp?.carrinho?.itens) {
         setCart(resp.carrinho.itens);
         return true;
       }
 
-      // se backend avisou que já está no carrinho
-      if (resp?.message?.toLowerCase().includes("já está")) {
-        await refreshCart();
-        return "already-in-cart";
-      }
-
-      // fallback: tenta sincronizar e assume sucesso
+      // fallback
       await refreshCart();
       return true;
     } catch (err) {
       console.error("Erro ao adicionar ao carrinho:", err);
-      return false;
+      return "Erro inesperado.";
     }
   };
 
@@ -92,7 +106,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
     try {
       const result = await api.removeFromCart(gameId);
       if (result?.message) {
-        // sincroniza
         await refreshCart();
         return true;
       }
@@ -102,16 +115,20 @@ export function CartProvider({ children }: { children: ReactNode }) {
     return false;
   };
 
-  const value: CartContextType = {
-    cart,
-    cartCount: cart.length,
-    isLoading,
-    refreshCart,
-    addToCart,
-    removeFromCart,
-  };
-
-  return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
+  return (
+    <CartContext.Provider
+      value={{
+        cart,
+        cartCount: cart.length,
+        isLoading,
+        refreshCart,
+        addToCart,
+        removeFromCart,
+      }}
+    >
+      {children}
+    </CartContext.Provider>
+  );
 }
 
 export function useCart() {

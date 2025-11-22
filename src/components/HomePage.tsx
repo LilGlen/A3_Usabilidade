@@ -259,9 +259,24 @@ export function HomePage({ onNavigate, searchTerm }: HomePageProps) {
 
       const result = await addToCart(found.id);
 
-      result
-        ? showToast({ type: "success", title: "Adicionado ao carrinho!" })
-        : showToast({ type: "error", title: "Erro ao adicionar ao carrinho" });
+      if (result === true) {
+        showToast({ type: "success", title: "Adicionado ao carrinho!" });
+      } else if (result === "already-in-cart") {
+        showToast({
+          type: "error",
+          title: "Jogo já está no carrinho.",
+        });
+      } else if (typeof result === "string") {
+        showToast({
+          type: "error",
+          title: result,
+        });
+      } else {
+        showToast({
+          type: "error",
+          title: "Erro ao adicionar ao carrinho.",
+        });
+      }
     },
     [isAuthenticated]
   );

@@ -75,13 +75,8 @@ export function useAPI() {
         }
 
         if (!resp.ok) {
-          // Log mais detalhado para debugging
-          console.error("API ERROR:", {
-            url,
-            status: resp.status,
-            body: data || resp.statusText,
-          });
-          return null;
+          console.error("API ERROR:", { url, status: resp.status, body: data });
+          throw { status: resp.status, body: data };
         }
 
         return data as T;
