@@ -67,6 +67,7 @@ export function useAPI() {
 
         const resp = await fetch(url, { ...options, headers });
 
+        // tenta pegar JSON SEMPRE
         let data: any = null;
         try {
           data = await resp.clone().json();
@@ -74,14 +75,27 @@ export function useAPI() {
           if (resp.status === 204) return null;
         }
 
+        // --- CORREÇÃO MAIOR: não retornar null em erros ---
         if (!resp.ok) {
           console.error("API ERROR:", { url, status: resp.status, body: data });
+
+          // se backend retornar mensagem, devolvemos ela ao chamador
+          if (data?.message) {
+            return data as T;
+          }
+
           throw { status: resp.status, body: data };
         }
 
         return data as T;
-      } catch (err) {
+      } catch (err: any) {
         console.error("CONNECTION ERROR:", err);
+
+        // se o erro tiver mensagem do backend, retorne ela
+        if (err?.body?.message) {
+          return err.body as T;
+        }
+
         return null;
       }
     },
