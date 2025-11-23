@@ -6,7 +6,7 @@ import { GameDetailsPageNew } from "./components/GameDetailsPageNew";
 import { AdminPageComplete } from "./components/AdminPageComplete";
 import { UserProfilePageNew } from "./components/UserProfilePageNew";
 import { ManagementPageNew } from "./components/ManagementPageNew";
-import { CheckoutPageNew } from "./components/CheckoutPageNew";
+import { CheckoutPage } from "./components/CheckoutPage";
 import { LandingPage } from "./components/LandingPage";
 import { ToastProvider } from "./components/ToastProvider";
 import { AuthProvider, useAuth } from "./components/AuthContext";
@@ -118,7 +118,7 @@ function AppContent({
         )}
 
         {currentPage === "checkout" && (
-          <CheckoutPageNew onNavigate={navigateToPage} />
+          <CheckoutPage onNavigate={navigateToPage} />
         )}
       </main>
       <Footer />
