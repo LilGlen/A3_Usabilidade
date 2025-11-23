@@ -5,7 +5,7 @@ import { Badge } from './ui/badge';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { PageType } from '../App';
-import { User, ShoppingBag, Star, Menu, X, ArrowLeft, Loader2, Heart, Trash2 } from 'lucide-react';
+import { User, ShoppingBag, Star, Menu, X, ArrowLeft, Loader2, Heart, Trash2, Calendar } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import { useAPI } from './useAPI';
 import { Avatar } from './Avatar';
@@ -72,7 +72,7 @@ export function UserProfilePageNew({ onNavigate }: UserProfilePageNewProps) {
           name: item.nome,
           price: item.preco || 0,
           discount: item.desconto || 0,
-          // Não usamos item.image ou imagem_url aqui pois preferimos o fallback pelo NOME
+          image: item.imagem_url || item.image
         }));
         setWishlist(wishlistMapped);
       }
@@ -98,6 +98,15 @@ export function UserProfilePageNew({ onNavigate }: UserProfilePageNewProps) {
       showToast({ type: 'error', title: 'Erro', message: 'Erro ao remover item.' });
     }
   }
+
+  // Função simulada de remover avaliação (apenas visual, pois backend não tem rota)
+  const handleRemoveReview = (reviewId: number) => {
+     showToast({
+        type: 'info',
+        title: 'Ação Indisponível',
+        message: 'A exclusão de avaliações não está habilitada no servidor.'
+     });
+  };
 
   const loadReviews = async () => {
     setIsLoading(true);
@@ -263,48 +272,54 @@ export function UserProfilePageNew({ onNavigate }: UserProfilePageNewProps) {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {wishlist.map((item) => (
-            <Card key={item.id} className="bg-secondary-bg border-border hover:border-accent-purple transition-all duration-300 hover:-translate-y-1">
-              <CardContent className="p-4">
-                <div className="w-full h-32 overflow-hidden rounded-lg mb-4 relative group">
-                  {/* CORREÇÃO: Puxa imagem igual à Home (via nome) */}
+            <Card key={item.id} className="bg-secondary-bg border-border hover:border-accent-purple transition-all duration-300 hover:-translate-y-1 flex flex-col">
+              <CardContent className="p-4 flex flex-col flex-grow">
+                {/* IMAGEM DO JOGO */}
+                <div className="w-full h-32 overflow-hidden rounded-lg mb-4 relative group bg-black/20">
                   <ImageWithFallback
                     gameName={item.name}
+                    src={undefined}
                     alt={item.name}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                   />
-                  
-                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                    <Button 
-                      variant="destructive" 
-                      size="sm"
-                      className="h-8 w-8 p-0 rounded-full bg-red-500/80 hover:bg-red-600"
-                      onClick={() => removeFromWishlist(item.id, item.name)}
-                    >
-                      <Trash2 className="w-4 h-4 text-white" />
-                    </Button>
-                  </div>
                 </div>
 
-                <h3 className="text-main-text font-bold mb-2 truncate">{item.name}</h3>
-                <div className="flex justify-between items-center">
-                  <div>
+                <h3 className="text-main-text font-bold mb-4 truncate text-lg">{item.name}</h3>
+                
+                {/* LINHA DE PREÇO E AÇÃO DE EXCLUIR */}
+                <div className="flex justify-between items-center mt-auto mb-4">
+                  <div className="flex flex-col">
                     {item.discount > 0 && (
-                      <p className="text-secondary-text line-through text-xs">
+                      <span className="text-secondary-text line-through text-xs">
                         R$ {item.price.toFixed(2).replace('.', ',')}
-                      </p>
+                      </span>
                     )}
-                    <p className="text-accent-purple font-bold">
-                      R$ {(item.price * (1 - item.discount / 100)).toFixed(2).replace('.', ',')}
-                    </p>
+                    <div className="flex items-center gap-2">
+                        <p className="text-accent-purple font-bold text-lg">
+                        R$ {(item.price * (1 - item.discount / 100)).toFixed(2).replace('.', ',')}
+                        </p>
+                        {item.discount > 0 && (
+                            <Badge className="bg-green-600 text-white text-[10px] h-5 px-1.5">
+                            -{item.discount}%
+                            </Badge>
+                        )}
+                    </div>
                   </div>
-                  {item.discount > 0 && (
-                    <Badge className="bg-green-600 text-white">
-                      -{item.discount}%
-                    </Badge>
-                  )}
+                  
+                  {/* BOTÃO EXCLUIR NA MESMA LINHA DO PREÇO */}
+                  <Button 
+                      variant="ghost" 
+                      size="icon"
+                      className="text-secondary-text hover:text-red-500 hover:bg-red-500/10 transition-colors h-8 w-8"
+                      onClick={() => removeFromWishlist(item.id, item.name)}
+                      title="Remover da lista"
+                  >
+                      <Trash2 className="w-5 h-5" />
+                  </Button>
                 </div>
+
                 <Button 
-                  className="w-full mt-4 bg-accent-purple hover:bg-accent-hover"
+                  className="w-full bg-accent-purple hover:bg-accent-hover"
                   onClick={() => onNavigate('details', { gameId: item.id })}
                 >
                   Ver Detalhes
@@ -338,46 +353,64 @@ export function UserProfilePageNew({ onNavigate }: UserProfilePageNewProps) {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4">
+        // MUDANÇA: Layout em Grid igual ao Wishlist
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {reviews.map((review, idx) => (
-            <div key={idx} className="bg-secondary-bg p-6 rounded-xl border border-border flex flex-col sm:flex-row gap-6">
-              {/* Capa do jogo na avaliação */}
-              <div className="w-full sm:w-24 h-32 flex-shrink-0 rounded-lg overflow-hidden bg-black/20 border border-border/50">
-                {/* CORREÇÃO: Puxa imagem igual à Home (via nome) */}
-                <ImageWithFallback 
-                  gameName={review.gameName}
-                  className="w-full h-full object-cover"
-                />
-              </div>
-
-              <div className="flex-1">
-                <div className="flex justify-between items-start mb-2">
-                  <h3 className="text-main-text font-bold text-lg hover:text-accent-purple cursor-pointer" onClick={() => onNavigate('details', { gameId: review.fkJogo })}>
-                    {review.gameName}
-                  </h3>
-                  <span className="text-xs text-secondary-text border border-border px-2 py-1 rounded">
-                    {new Date(review.data || Date.now()).toLocaleDateString()}
-                  </span>
-                </div>
-
-                <div className="flex text-yellow-400 mb-3">
-                  {[...Array(5)].map((_, i) => (
-                    <Star
-                      key={i}
-                      className={`w-4 h-4 ${
-                        i < (review.nota || 0)
-                          ? "fill-current"
-                          : "text-gray-600"
-                      }`}
+            <Card key={idx} className="bg-secondary-bg border-border hover:border-accent-purple transition-all duration-300 hover:-translate-y-1 flex flex-col">
+              <CardContent className="p-4 flex flex-col flex-grow">
+                
+                {/* IMAGEM DO JOGO (Grande, igual Wishlist) */}
+                <div className="w-full h-32 overflow-hidden rounded-lg mb-4 relative group bg-black/20 cursor-pointer" onClick={() => onNavigate('details', { gameId: review.fkJogo })}>
+                    <ImageWithFallback 
+                    gameName={review.gameName}
+                    src={undefined} 
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                     />
-                  ))}
                 </div>
 
-                <p className="text-secondary-text leading-relaxed italic">
-                  "{review.comentario}"
-                </p>
-              </div>
-            </div>
+                <h3 className="text-main-text font-bold mb-2 truncate text-lg hover:text-accent-purple cursor-pointer transition-colors" onClick={() => onNavigate('details', { gameId: review.fkJogo })}>
+                    {review.gameName}
+                </h3>
+
+                {/* LINHA DE AVALIAÇÃO E BOTÃO EXCLUIR (Alinhados) */}
+                <div className="flex justify-between items-center mb-3">
+                    <div className="flex flex-col">
+                        <div className="flex text-yellow-400">
+                            {[...Array(5)].map((_, i) => (
+                            <Star
+                                key={i}
+                                className={`w-4 h-4 ${
+                                i < (review.nota || 0)
+                                    ? "fill-current"
+                                    : "text-gray-600"
+                                }`}
+                            />
+                            ))}
+                        </div>
+                        <span className="text-xs text-secondary-text mt-1">
+                            {new Date(review.data || Date.now()).toLocaleDateString()}
+                        </span>
+                    </div>
+
+                    {/* BOTÃO EXCLUIR NA MESMA LINHA DAS ESTRELAS */}
+                    <Button 
+                        variant="ghost" 
+                        size="icon"
+                        className="text-secondary-text hover:text-red-500 hover:bg-red-500/10 transition-colors h-8 w-8"
+                        onClick={() => handleRemoveReview(review.id)}
+                        title="Excluir avaliação"
+                    >
+                        <Trash2 className="w-5 h-5" />
+                    </Button>
+                </div>
+
+                <div className="bg-main-bg/50 p-3 rounded-lg border border-border/30 mt-auto">
+                    <p className="text-secondary-text text-sm italic line-clamp-3">
+                    "{review.comentario}"
+                    </p>
+                </div>
+              </CardContent>
+            </Card>
           ))}
         </div>
       )}
