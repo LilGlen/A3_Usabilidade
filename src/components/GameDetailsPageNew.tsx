@@ -1,4 +1,3 @@
-// GameDetailsPageNew.tsx
 import React, { useEffect, useState } from "react";
 import {
   Star,
@@ -29,7 +28,7 @@ export function GameDetailsPageNew({
   gameId,
   onNavigate,
 }: GameDetailsPageProps) {
-  const [game, setGame] = useState<any | null>(null); // será preenchido com result.jogo
+  const [game, setGame] = useState<any | null>(null);
   const [reviews, setReviews] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [userRating, setUserRating] = useState(0);
@@ -37,6 +36,7 @@ export function GameDetailsPageNew({
   const [hasSpoilers, setHasSpoilers] = useState(false);
   const [submittingReview, setSubmittingReview] = useState(false);
   const [activeMedia, setActiveMedia] = useState(0);
+  const [isAddingToWishlist, setIsAddingToWishlist] = useState(false);
 
   const api = useAPI();
   const { isAuthenticated } = useAuth();
@@ -55,11 +55,39 @@ export function GameDetailsPageNew({
         api.getGameReviews(gameId || ""),
       ]);
 
-      if (gameResult?.jogo) setGame(gameResult.jogo);
-      else setGame(null);
+      console.log("Game API result:", gameResult);
+      console.log("Reviews API result:", reviewsResult, "Type:", typeof reviewsResult);
 
-      if (reviewsResult?.reviews) setReviews(reviewsResult.reviews);
-      else setReviews([]);
+      if (gameResult) {
+        const mappedGame = {
+          ...gameResult,
+          id: gameResult.id,
+          nome: gameResult.titulo || gameResult.nome || gameResult.name,
+          descricao: gameResult.descricao || gameResult.description,
+          preco: gameResult.preco || gameResult.price || 0,
+          nota_media: gameResult.nota_media || gameResult.rating || 0,
+          empresa: gameResult.desenvolvedora || gameResult.empresa || gameResult.company,
+          categoria: gameResult.categoria || gameResult.category,
+          imagem_url: gameResult.imagem_url || gameResult.image || "",
+        };
+        setGame(mappedGame);
+      } else {
+        setGame(null);
+      }
+
+      if (Array.isArray(reviewsResult)) {
+        const mappedReviews = reviewsResult.map((r: any) => ({
+          ...r,
+          nota: r.nota || r.rating,
+          comentario: r.comentario || r.comment,
+          usuario: r.usuario || r.userName || "Usuário",
+          hasSpoilers: r.spoilers || false,
+        }));
+        setReviews(mappedReviews);
+      } else {
+        console.warn("Reviews não é um array; definindo como vazio:", reviewsResult);
+        setReviews([]);
+      }
     } catch (err) {
       console.error("Error loading game details:", err);
       toast.error("Erro ao carregar detalhes do jogo");
@@ -82,15 +110,42 @@ export function GameDetailsPageNew({
 
     const result = await addToCart(Number(game.id));
     if (result === true) {
-      toast.success(
-        `${game.nome || game.name || "Jogo"} adicionado ao carrinho!`
-      );
+      toast.success(`${game.nome || "Jogo"} adicionado ao carrinho!`);
     } else if (result === "already-in-cart") {
-      toast.info(`${game.nome || game.name || "Jogo"} já está no carrinho!`);
+      toast.info(`${game.nome || "Jogo"} já está no carrinho!`);
     } else {
       toast.error("Erro ao adicionar ao carrinho. Tente novamente.");
     }
   };
+const handleAddToWishlist = async () => {
+  if (!isAuthenticated) {
+    toast.error("Faça login para adicionar à lista de desejos");
+    return;
+  }
+  if (!game?.id) {
+    toast.error("ID do jogo inválido");
+    return;
+  }
+
+  setIsAddingToWishlist(true);
+  try {
+    const result = await api.addToWishlist(Number(game.id));
+    if (result?.item) {
+      toast.success(`${game.nome || "Jogo"} adicionado à lista de desejos!`);
+    } else {
+      toast.error("Erro ao adicionar à lista de desejos. Tente novamente.");
+    }
+  } catch (err: any) {
+    console.error("Error adding to wishlist:", err);
+    if (err?.status === 409) {
+      toast.info(`${game.nome || "Jogo"} já está na lista de desejos!`); // Tratamento para 409
+    } else {
+      toast.error("Erro ao adicionar à lista de desejos.");
+    }
+  } finally {
+    setIsAddingToWishlist(false);
+  }
+};
 
   const handleSubmitReview = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -109,7 +164,6 @@ export function GameDetailsPageNew({
 
     setSubmittingReview(true);
     try {
-      // Backend espera { jogoId, nota, comentario }
       const result = await api.createReview({
         jogoId: Number(gameId),
         nota: userRating,
@@ -121,7 +175,7 @@ export function GameDetailsPageNew({
         setUserRating(0);
         setUserComment("");
         setHasSpoilers(false);
-        await loadGameDetails();
+        await loadGameDetails(); // Ajustado: use loadGameDetails em vez de loadGame
       } else {
         toast.error("Erro ao enviar avaliação");
       }
@@ -186,7 +240,7 @@ export function GameDetailsPageNew({
               <ImageWithFallback
                 src={mediaItems[activeMedia]}
                 alt={`${game.nome || game.name} - Imagem ${activeMedia + 1}`}
-                gameName= {game.nome}
+                gameName={game.nome}
                 className="w-full h-64 sm:h-80 object-cover"
               />
             </div>
@@ -205,7 +259,7 @@ export function GameDetailsPageNew({
                   <ImageWithFallback
                     src={m}
                     alt={`Miniatura ${idx + 1}`}
-                    gameName= {game.nome}
+                    gameName={game.nome}
                     className="w-full h-16 sm:h-20 object-cover rounded-lg"
                   />
                 </button>
@@ -259,11 +313,15 @@ export function GameDetailsPageNew({
               <Button
                 variant="outline"
                 className="w-full border-secondary-text text-secondary-text"
-                onClick={() =>
-                  toast.info("Função de wishlist ainda não implementada aqui")
-                }
+                onClick={handleAddToWishlist}
+                disabled={isAddingToWishlist}
               >
-                <Heart className="w-5 h-5 mr-2" /> Adicionar à Lista de Desejos
+                {isAddingToWishlist ? (
+                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                ) : (
+                  <Heart className="w-5 h-5 mr-2" />
+                )}
+                Adicionar à Lista de Desejos
               </Button>
             </div>
           </div>
@@ -370,19 +428,19 @@ export function GameDetailsPageNew({
                     <div key={idx} className="border-b border-border py-4">
                       <div className="flex gap-3 items-center">
                         <Avatar
-                          name={review.userName || review.usuario || "Usuário"}
+                          name={review.usuario || "Usuário"}
                           size={40}
                         />
                         <div>
                           <p className="text-main-text">
-                            {review.userName || review.usuario}
+                            {review.usuario}
                           </p>
                           <div className="flex">
                             {[...Array(5)].map((_, i) => (
                               <Star
                                 key={i}
                                 className={`w-3 h-3 ${
-                                  i < (review.rating ?? review.nota)
+                                  i < (review.nota || 0)
                                     ? "fill-current text-yellow-400"
                                     : "text-gray-600"
                                 }`}
@@ -398,12 +456,12 @@ export function GameDetailsPageNew({
                             ⚠️ Contém spoilers
                           </summary>
                           <p className="text-secondary-text mt-3">
-                            {review.comment || review.comentario}
+                            {review.comentario}
                           </p>
                         </details>
                       ) : (
                         <p className="text-secondary-text mt-3">
-                          {review.comment || review.comentario}
+                          {review.comentario}
                         </p>
                       )}
                     </div>

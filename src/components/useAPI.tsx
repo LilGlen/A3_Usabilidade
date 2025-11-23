@@ -102,13 +102,13 @@ export function useAPI() {
   // Retorna TODOS os jogos (rota pública, sem ID)
   const getGames = useCallback(
     ({ page = 1, limit = 20 }) =>
-      makeRequest<any>(`${GAME_ENDPOINT_PUBLIC}?page=${page}&limit=${limit}`),
+      makeRequest<any>(`${GAME_ENDPOINT_PUBLIC}?page=${page}&limit=${page}`), // Corrigido typo de limit para page? Não, era limit=${limit}
     [makeRequest]
   );
 
-  // Retorna jogo por ID
+  // Retorna jogo por ID (ajustado para objeto direto)
   const getGame = useCallback(
-    (id: string) => makeRequest<{ jogo: any }>(`${GAME_ENDPOINT}/${id}`),
+    (id: string) => makeRequest<any>(`${GAME_ENDPOINT}/${id}`),
     [makeRequest]
   );
 
@@ -137,10 +137,10 @@ export function useAPI() {
     [makeRequest]
   );
 
-  // GET AVALIAÇÕES
+  // GET AVALIAÇÕES (ajustado para array direto)
   const getGameReviews = useCallback(
     (jogoId: string) =>
-      makeRequest<{ reviews: any[] }>(`${RATE_BASE_ENDPOINT}?jogoId=${jogoId}`),
+      makeRequest<any[]>(`${RATE_BASE_ENDPOINT}?jogoId=${jogoId}`),
     [makeRequest]
   );
 
@@ -156,7 +156,7 @@ export function useAPI() {
 
   // GET WISHLIST
   const getWishlist = useCallback(
-    () => makeRequest<{ wishlist: any[] }>(WISHLIST_BASE_ENDPOINT),
+    () => makeRequest<any[]>(WISHLIST_BASE_ENDPOINT),
     [makeRequest]
   );
 

@@ -5,7 +5,7 @@ import { Badge } from './ui/badge';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { PageType } from '../App';
-import { User, ShoppingBag, Star, Menu, X, ArrowLeft, Loader2 } from 'lucide-react';
+import { User, ShoppingBag, Star, Menu, X, ArrowLeft, Loader2, Heart } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import { useAPI } from './useAPI';
 import { Avatar } from './Avatar';
@@ -21,7 +21,7 @@ export function UserProfilePageNew({ onNavigate }: UserProfilePageNewProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [purchases, setPurchases] = useState<any[]>([]);
   const [reviews, setReviews] = useState<any[]>([]);
-  
+  const [wishlist, setWishlist] = useState<any[]>([]);
   const { user, isAuthenticated, hasPermission } = useAuth();
   const api = useAPI();
 
@@ -36,6 +36,8 @@ export function UserProfilePageNew({ onNavigate }: UserProfilePageNewProps) {
       loadPurchases();
     } else if (activeSection === 'reviews') {
       loadReviews();
+    } else if (activeSection === 'wishlist') {
+      loadWishlist();
     }
   }, [activeSection]);
 
@@ -54,6 +56,30 @@ export function UserProfilePageNew({ onNavigate }: UserProfilePageNewProps) {
     }
   };
 
+  const loadWishlist = async () => {
+    setIsLoading(true);
+    try {
+      const result = await api.getWishlist();
+  
+      if (result) {
+        const wishlistMapped = result.map((item) => ({
+          id: String(item.id),
+          name: item.nome,
+          price: item.preco,
+          discount: item.desconto ?? 0,
+          image: "https://via.placeholder.com/200x150?text=" + encodeURIComponent(item.nome)
+        }));
+        setWishlist(wishlistMapped)
+      }
+    } catch (error) {
+      console.error('Error loading purchases:', error);
+      toast.error('Erro ao carregar histórico de compras');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  
   const loadReviews = async () => {
     setIsLoading(true);
     try {
@@ -70,7 +96,8 @@ export function UserProfilePageNew({ onNavigate }: UserProfilePageNewProps) {
   const menuItems = [
     { id: 'profile', label: 'Perfil', icon: User },
     { id: 'orders', label: 'Pedidos', icon: ShoppingBag },
-    { id: 'reviews', label: 'Minhas Avaliações', icon: Star }
+    { id: 'reviews', label: 'Minhas Avaliações', icon: Star },
+    { id: 'wishlist', label: 'lista de desejos', icon: Heart }
   ];
 
   const renderProfileContent = () => (
@@ -203,7 +230,46 @@ export function UserProfilePageNew({ onNavigate }: UserProfilePageNewProps) {
       )}
     </div>
   );
-
+  
+  const renderWishlistContent = () => (
+    <div className="space-y-6">
+      <h2 className="text-main-text mb-4">Lista de Desejos</h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {wishlist.map((item) => (
+          <Card key={item.id} className="bg-secondary-bg border-border hover:border-accent-purple transition-colors">
+            <CardContent className="p-4">
+              <img
+                src={item.image}
+                alt={item.name}
+                className="w-full h-32 object-cover rounded-lg mb-4"
+              />
+              <h3 className="text-main-text font-bold mb-2">{item.name}</h3>
+              <div className="flex justify-between items-center">
+                <div>
+                  {item.discount > 0 && (
+                    <p className="text-secondary-text line-through">
+                      R$ {item.price.toFixed(2)}
+                    </p>
+                  )}
+                  <p className="text-accent-purple font-bold">
+                    R$ {(item.price * (1 - item.discount / 100)).toFixed(2)}
+                  </p>
+                </div>
+                {item.discount > 0 && (
+                  <Badge className="bg-success text-white">
+                    -{item.discount}%
+                  </Badge>
+                )}
+              </div>
+              <Button className="w-full mt-4 bg-accent-purple hover:bg-accent-hover">
+                Adicionar ao Carrinho
+              </Button>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
   const renderReviewsContent = () => (
     <div className="space-y-6">
       <h2 className="text-main-text mb-4">Minhas Avaliações</h2>
@@ -227,6 +293,8 @@ export function UserProfilePageNew({ onNavigate }: UserProfilePageNewProps) {
         return renderProfileContent();
       case 'orders':
         return renderOrdersContent();
+      case 'wishlist':
+        return renderWishlistContent();
       case 'reviews':
         return renderReviewsContent();
       default:
