@@ -16,7 +16,7 @@ import { useAPI } from "./useAPI";
 import { useAuth } from "./AuthContext";
 import { useCart } from "./CartContext";
 import { Avatar } from "./Avatar";
-import { toast } from "sonner";
+import { useToast } from "./ToastProvider"; // 1. Importação do hook do Toast
 import { ImageWithFallback } from "./figma/ImageWithFallback";
 
 interface GameDetailsPageProps {
@@ -41,6 +41,7 @@ export function GameDetailsPageNew({
   const api = useAPI();
   const { isAuthenticated } = useAuth();
   const { addToCart } = useCart();
+  const { showToast } = useToast(); // 2. Inicialização do hook
 
   useEffect(() => {
     if (gameId) loadGameDetails();
@@ -90,7 +91,12 @@ export function GameDetailsPageNew({
       }
     } catch (err) {
       console.error("Error loading game details:", err);
-      toast.error("Erro ao carregar detalhes do jogo");
+      // 3. Substituição dos toasts de erro
+      showToast({ 
+        type: "error", 
+        title: "Erro", 
+        message: "Erro ao carregar detalhes do jogo" 
+      });
       setGame(null);
       setReviews([]);
     } finally {
@@ -100,65 +106,112 @@ export function GameDetailsPageNew({
 
   const handleAddToCart = async () => {
     if (!isAuthenticated) {
-      toast.error("Faça login para adicionar ao carrinho");
+      showToast({ 
+        type: "info", 
+        title: "Login necessário", 
+        message: "Faça login para adicionar ao carrinho" 
+      });
       return;
     }
     if (!game?.id) {
-      toast.error("ID do jogo inválido");
+      showToast({ type: "error", title: "Erro", message: "ID do jogo inválido" });
       return;
     }
 
     const result = await addToCart(Number(game.id));
+    
+    // 4. Lógica de feedback do carrinho usando showToast
     if (result === true) {
-      toast.success(`${game.nome || "Jogo"} adicionado ao carrinho!`);
+      showToast({ 
+        type: "success", 
+        title: "Adicionado!", 
+        message: `${game.nome || "Jogo"} adicionado ao carrinho.` 
+      });
     } else if (result === "already-in-cart") {
-      toast.info(`${game.nome || "Jogo"} já está no carrinho!`);
+      showToast({ 
+        type: "info", 
+        title: "Atenção", 
+        message: `${game.nome || "Jogo"} já está no carrinho!` 
+      });
     } else {
-      toast.error("Erro ao adicionar ao carrinho. Tente novamente.");
+      showToast({ 
+        type: "error", 
+        title: "Erro", 
+        message: "Não foi possível adicionar ao carrinho." 
+      });
     }
   };
-const handleAddToWishlist = async () => {
-  if (!isAuthenticated) {
-    toast.error("Faça login para adicionar à lista de desejos");
-    return;
-  }
-  if (!game?.id) {
-    toast.error("ID do jogo inválido");
-    return;
-  }
 
-  setIsAddingToWishlist(true);
-  try {
-    const result = await api.addToWishlist(Number(game.id));
-    if (result?.item) {
-      toast.success(`${game.nome || "Jogo"} adicionado à lista de desejos!`);
-    } else {
-      toast.error("Erro ao adicionar à lista de desejos. Tente novamente.");
+  const handleAddToWishlist = async () => {
+    if (!isAuthenticated) {
+      showToast({ 
+        type: "info", 
+        title: "Login necessário", 
+        message: "Faça login para adicionar à lista de desejos" 
+      });
+      return;
     }
-  } catch (err: any) {
-    console.error("Error adding to wishlist:", err);
-    if (err?.status === 409) {
-      toast.info(`${game.nome || "Jogo"} já está na lista de desejos!`); // Tratamento para 409
-    } else {
-      toast.error("Erro ao adicionar à lista de desejos.");
+    if (!game?.id) {
+      showToast({ type: "error", title: "Erro", message: "ID do jogo inválido" });
+      return;
     }
-  } finally {
-    setIsAddingToWishlist(false);
-  }
-};
+
+    setIsAddingToWishlist(true);
+    try {
+      const result = await api.addToWishlist(Number(game.id));
+      if (result?.item) {
+        showToast({ 
+          type: "success", 
+          title: "Lista de Desejos", 
+          message: `${game.nome || "Jogo"} salvo na sua lista!` 
+        });
+      } else {
+        showToast({ 
+          type: "error", 
+          title: "Erro", 
+          message: "Falha ao salvar na lista de desejos." 
+        });
+      }
+    } catch (err: any) {
+      console.error("Error adding to wishlist:", err);
+      if (err?.status === 409) {
+        showToast({ 
+          type: "info", 
+          title: "Já salvo", 
+          message: `${game.nome || "Jogo"} já está na sua lista!` 
+        });
+      } else {
+        showToast({ 
+          type: "error", 
+          title: "Erro", 
+          message: "Erro ao adicionar à lista de desejos." 
+        });
+      }
+    } finally {
+      setIsAddingToWishlist(false);
+    }
+  };
 
   const handleSubmitReview = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isAuthenticated) {
-      toast.error("Faça login para avaliar jogos");
+      showToast({ 
+        type: "info", 
+        title: "Login necessário", 
+        message: "Faça login para avaliar jogos" 
+      });
       return;
     }
     if (!gameId) {
-      toast.error("ID do jogo inválido");
+      showToast({ type: "error", title: "Erro", message: "ID do jogo inválido" });
       return;
     }
     if (userRating === 0) {
-      toast.error("Selecione uma nota de 1 a 5 estrelas");
+      showToast({ 
+        type: "warning", 
+        title: "Avaliação", 
+        message: "Selecione uma nota de 1 a 5 estrelas" 
+      });
       return;
     }
 
@@ -171,17 +224,29 @@ const handleAddToWishlist = async () => {
       });
 
       if (result?.review) {
-        toast.success("Avaliação enviada!");
+        showToast({ 
+          type: "success", 
+          title: "Sucesso!", 
+          message: "Sua avaliação foi enviada." 
+        });
         setUserRating(0);
         setUserComment("");
         setHasSpoilers(false);
-        await loadGameDetails(); // Ajustado: use loadGameDetails em vez de loadGame
+        await loadGameDetails();
       } else {
-        toast.error("Erro ao enviar avaliação");
+        showToast({ 
+          type: "error", 
+          title: "Erro", 
+          message: "Não foi possível enviar a avaliação." 
+        });
       }
     } catch (err) {
       console.error("Error submitting review:", err);
-      toast.error("Erro ao enviar avaliação");
+      showToast({ 
+        type: "error", 
+        title: "Erro", 
+        message: "Erro ao conectar com o servidor." 
+      });
     } finally {
       setSubmittingReview(false);
     }
