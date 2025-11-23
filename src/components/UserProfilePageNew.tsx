@@ -5,27 +5,30 @@ import { Badge } from './ui/badge';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { PageType } from '../App';
-import { User, ShoppingBag, Star, Menu, X, ArrowLeft, Loader2, Heart } from 'lucide-react';
+import { User, ShoppingBag, Star, Menu, X, ArrowLeft, Loader2, Heart, Trash2 } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import { useAPI } from './useAPI';
 import { Avatar } from './Avatar';
-import { toast } from 'sonner@2.0.3';
+import { useToast } from './ToastProvider';
+import { ImageWithFallback } from './figma/ImageWithFallback';
 
 interface UserProfilePageNewProps {
-  onNavigate: (page: PageType) => void;
+  onNavigate: (page: PageType, data?: any) => void;
 }
 
 export function UserProfilePageNew({ onNavigate }: UserProfilePageNewProps) {
   const [activeSection, setActiveSection] = useState('profile');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  
   const [purchases, setPurchases] = useState<any[]>([]);
   const [reviews, setReviews] = useState<any[]>([]);
   const [wishlist, setWishlist] = useState<any[]>([]);
-  const { user, isAuthenticated, hasPermission } = useAuth();
+  
+  const { user, isAuthenticated } = useAuth();
   const api = useAPI();
+  const { showToast } = useToast();
 
-  // Redirect to home if not authenticated
   if (!isAuthenticated || !user) {
     onNavigate('home');
     return null;
@@ -39,18 +42,21 @@ export function UserProfilePageNew({ onNavigate }: UserProfilePageNewProps) {
     } else if (activeSection === 'wishlist') {
       loadWishlist();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSection]);
 
   const loadPurchases = async () => {
     setIsLoading(true);
     try {
       const result = await api.getPurchaseHistory();
-      if (result?.success) {
-        setPurchases(result.purchases || []);
+      if (Array.isArray(result)) {
+        setPurchases(result);
+      } else {
+        setPurchases([]);
       }
     } catch (error) {
       console.error('Error loading purchases:', error);
-      toast.error('Erro ao carregar histórico de compras');
+      showToast({ type: 'error', title: 'Erro', message: 'Erro ao carregar histórico.' });
     } finally {
       setIsLoading(false);
     }
@@ -60,34 +66,65 @@ export function UserProfilePageNew({ onNavigate }: UserProfilePageNewProps) {
     setIsLoading(true);
     try {
       const result = await api.getWishlist();
-  
-      if (result) {
+      if (Array.isArray(result)) {
         const wishlistMapped = result.map((item) => ({
-          id: String(item.id),
+          id: item.id,
           name: item.nome,
-          price: item.preco,
-          discount: item.desconto ?? 0,
-          image: "https://via.placeholder.com/200x150?text=" + encodeURIComponent(item.nome)
+          price: item.preco || 0,
+          discount: item.desconto || 0,
+          // Não usamos item.image ou imagem_url aqui pois preferimos o fallback pelo NOME
         }));
-        setWishlist(wishlistMapped)
+        setWishlist(wishlistMapped);
       }
     } catch (error) {
-      console.error('Error loading purchases:', error);
-      toast.error('Erro ao carregar histórico de compras');
+      console.error('Error loading wishlist:', error);
+      showToast({ type: 'error', title: 'Erro', message: 'Erro ao carregar lista de desejos.' });
     } finally {
       setIsLoading(false);
     }
   };
 
-  
+  const removeFromWishlist = async (gameId: number, gameName: string) => {
+    try {
+      await api.removeFromWishlist(gameId);
+      showToast({ 
+        type: 'success', 
+        title: 'Removido', 
+        message: `${gameName} removido da lista de desejos.` 
+      });
+      loadWishlist();
+    } catch (error) {
+      console.error("Erro ao remover:", error);
+      showToast({ type: 'error', title: 'Erro', message: 'Erro ao remover item.' });
+    }
+  }
+
   const loadReviews = async () => {
     setIsLoading(true);
     try {
-      // In a real app, we'd have an endpoint to get user's reviews
-      // For now, we'll just show a message
-      setReviews([]);
+      const userReviews = await api.getUserReviews();
+      
+      if (Array.isArray(userReviews) && userReviews.length > 0) {
+        const reviewsWithGameDetails = await Promise.all(
+          userReviews.map(async (review) => {
+            try {
+              const gameDetails = await api.getGame(review.fkJogo);
+              return {
+                ...review,
+                gameName: gameDetails?.nome || gameDetails?.titulo || "Jogo Desconhecido",
+              };
+            } catch {
+              return { ...review, gameName: "Jogo não encontrado" };
+            }
+          })
+        );
+        setReviews(reviewsWithGameDetails);
+      } else {
+        setReviews([]);
+      }
     } catch (error) {
       console.error('Error loading reviews:', error);
+      showToast({ type: 'error', title: 'Erro', message: 'Erro ao carregar avaliações.' });
     } finally {
       setIsLoading(false);
     }
@@ -97,11 +134,11 @@ export function UserProfilePageNew({ onNavigate }: UserProfilePageNewProps) {
     { id: 'profile', label: 'Perfil', icon: User },
     { id: 'orders', label: 'Pedidos', icon: ShoppingBag },
     { id: 'reviews', label: 'Minhas Avaliações', icon: Star },
-    { id: 'wishlist', label: 'lista de desejos', icon: Heart }
+    { id: 'wishlist', label: 'Lista de Desejos', icon: Heart }
   ];
 
   const renderProfileContent = () => (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <Card className="bg-secondary-bg border-border">
         <CardHeader>
           <CardTitle className="text-main-text">Informações Pessoais</CardTitle>
@@ -116,9 +153,8 @@ export function UserProfilePageNew({ onNavigate }: UserProfilePageNewProps) {
               <Input
                 id="name"
                 value={user.name}
-                className="bg-main-bg border-border text-main-text"
+                className="bg-main-bg border-border text-main-text mt-1"
                 readOnly
-                aria-label="Nome completo"
               />
             </div>
             <div>
@@ -127,9 +163,8 @@ export function UserProfilePageNew({ onNavigate }: UserProfilePageNewProps) {
                 id="email"
                 type="email"
                 value={user.email}
-                className="bg-main-bg border-border text-main-text"
+                className="bg-main-bg border-border text-main-text mt-1"
                 readOnly
-                aria-label="Email"
               />
             </div>
           </div>
@@ -139,9 +174,8 @@ export function UserProfilePageNew({ onNavigate }: UserProfilePageNewProps) {
               <Input
                 id="role"
                 value={user.role === 'admin' ? 'Administrador' : 'Usuário'}
-                className="bg-main-bg border-border text-main-text"
+                className="bg-main-bg border-border text-main-text mt-1"
                 readOnly
-                aria-label="Tipo de conta"
               />
             </div>
             <div>
@@ -149,9 +183,8 @@ export function UserProfilePageNew({ onNavigate }: UserProfilePageNewProps) {
               <Input
                 id="joinDate"
                 value={new Date(user.joinDate).toLocaleDateString('pt-BR')}
-                className="bg-main-bg border-border text-main-text"
+                className="bg-main-bg border-border text-main-text mt-1"
                 readOnly
-                aria-label="Data de cadastro"
               />
             </div>
           </div>
@@ -161,8 +194,8 @@ export function UserProfilePageNew({ onNavigate }: UserProfilePageNewProps) {
   );
 
   const renderOrdersContent = () => (
-    <div className="space-y-6">
-      <h2 className="text-main-text mb-4">Histórico de Compras</h2>
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <h2 className="text-main-text mb-4 text-2xl font-bold">Histórico de Compras</h2>
       {isLoading ? (
         <div className="flex justify-center py-12">
           <Loader2 className="w-8 h-8 text-accent-purple animate-spin" />
@@ -182,47 +215,30 @@ export function UserProfilePageNew({ onNavigate }: UserProfilePageNewProps) {
         </Card>
       ) : (
         purchases.map((order) => (
-          <Card key={order.id} className="bg-secondary-bg border-border">
+          <Card key={order.id} className="bg-secondary-bg border-border mb-4">
             <CardContent className="p-6">
               <div className="flex justify-between items-start mb-4">
                 <div>
-                  <p className="text-main-text">Pedido #{order.id}</p>
+                  <p className="text-main-text font-bold">Pedido #{order.id}</p>
                   <p className="text-secondary-text text-sm">
-                    {new Date(order.date).toLocaleDateString('pt-BR', {
-                      day: '2-digit',
-                      month: 'long',
-                      year: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit'
+                    {new Date(order.data || Date.now()).toLocaleDateString('pt-BR', {
+                      day: '2-digit', month: 'long', year: 'numeric'
                     })}
                   </p>
                 </div>
                 <Badge 
                   variant="outline" 
-                  className={order.status === 'Concluída' ? 'text-success border-success' : 'text-yellow-500 border-yellow-500'}
+                  className="text-green-500 border-green-500"
                 >
-                  {order.status}
+                  Concluída
                 </Badge>
               </div>
-              <div className="mb-4">
-                <p className="text-secondary-text text-sm mb-2">Jogos:</p>
-                <div className="space-y-1">
-                  {order.games?.map((game: any, index: number) => (
-                    <div key={index} className="flex justify-between items-center bg-main-bg p-2 rounded">
-                      <span className="text-main-text text-sm">• {game.name}</span>
-                      <span className="text-accent-purple text-sm">R$ {game.price?.toFixed(2)}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              
               <div className="flex justify-between items-center pt-4 border-t border-border">
-                <span className="text-secondary-text">Total</span>
-                <span className="text-accent-purple font-bold text-lg">R$ {order.total?.toFixed(2)}</span>
-              </div>
-              <div className="mt-2">
-                <p className="text-secondary-text text-sm">
-                  Método de pagamento: {order.paymentMethod || 'Cartão de Crédito'}
-                </p>
+                <span className="text-secondary-text">Itens: {order.quantidade}</span>
+                <span className="text-accent-purple font-bold text-lg">
+                  Total: R$ {Number(order.valorTotal || order.valor_total || 0).toFixed(2).replace('.', ',')}
+                </span>
               </div>
             </CardContent>
           </Card>
@@ -232,73 +248,149 @@ export function UserProfilePageNew({ onNavigate }: UserProfilePageNewProps) {
   );
   
   const renderWishlistContent = () => (
-    <div className="space-y-6">
-      <h2 className="text-main-text mb-4">Lista de Desejos</h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {wishlist.map((item) => (
-          <Card key={item.id} className="bg-secondary-bg border-border hover:border-accent-purple transition-colors">
-            <CardContent className="p-4">
-              <img
-                src={item.image}
-                alt={item.name}
-                className="w-full h-32 object-cover rounded-lg mb-4"
-              />
-              <h3 className="text-main-text font-bold mb-2">{item.name}</h3>
-              <div className="flex justify-between items-center">
-                <div>
-                  {item.discount > 0 && (
-                    <p className="text-secondary-text line-through">
-                      R$ {item.price.toFixed(2)}
-                    </p>
-                  )}
-                  <p className="text-accent-purple font-bold">
-                    R$ {(item.price * (1 - item.discount / 100)).toFixed(2)}
-                  </p>
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <h2 className="text-main-text mb-4 text-2xl font-bold">Lista de Desejos</h2>
+      
+      {isLoading ? (
+        <div className="flex justify-center py-12">
+          <Loader2 className="w-8 h-8 text-accent-purple animate-spin" />
+        </div>
+      ) : wishlist.length === 0 ? (
+        <div className="text-center py-12 bg-secondary-bg/50 rounded-xl border border-border border-dashed">
+          <Heart className="w-12 h-12 text-secondary-text mx-auto mb-4 opacity-50" />
+          <p className="text-secondary-text">Sua lista de desejos está vazia.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {wishlist.map((item) => (
+            <Card key={item.id} className="bg-secondary-bg border-border hover:border-accent-purple transition-all duration-300 hover:-translate-y-1">
+              <CardContent className="p-4">
+                <div className="w-full h-32 overflow-hidden rounded-lg mb-4 relative group">
+                  {/* CORREÇÃO: Puxa imagem igual à Home (via nome) */}
+                  <ImageWithFallback
+                    gameName={item.name}
+                    alt={item.name}
+                    className="w-full h-full object-cover"
+                  />
+                  
+                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                    <Button 
+                      variant="destructive" 
+                      size="sm"
+                      className="h-8 w-8 p-0 rounded-full bg-red-500/80 hover:bg-red-600"
+                      onClick={() => removeFromWishlist(item.id, item.name)}
+                    >
+                      <Trash2 className="w-4 h-4 text-white" />
+                    </Button>
+                  </div>
                 </div>
-                {item.discount > 0 && (
-                  <Badge className="bg-success text-white">
-                    -{item.discount}%
-                  </Badge>
-                )}
-              </div>
-              <Button className="w-full mt-4 bg-accent-purple hover:bg-accent-hover">
-                Adicionar ao Carrinho
-              </Button>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+
+                <h3 className="text-main-text font-bold mb-2 truncate">{item.name}</h3>
+                <div className="flex justify-between items-center">
+                  <div>
+                    {item.discount > 0 && (
+                      <p className="text-secondary-text line-through text-xs">
+                        R$ {item.price.toFixed(2).replace('.', ',')}
+                      </p>
+                    )}
+                    <p className="text-accent-purple font-bold">
+                      R$ {(item.price * (1 - item.discount / 100)).toFixed(2).replace('.', ',')}
+                    </p>
+                  </div>
+                  {item.discount > 0 && (
+                    <Badge className="bg-green-600 text-white">
+                      -{item.discount}%
+                    </Badge>
+                  )}
+                </div>
+                <Button 
+                  className="w-full mt-4 bg-accent-purple hover:bg-accent-hover"
+                  onClick={() => onNavigate('details', { gameId: item.id })}
+                >
+                  Ver Detalhes
+                </Button>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
+
   const renderReviewsContent = () => (
-    <div className="space-y-6">
-      <h2 className="text-main-text mb-4">Minhas Avaliações</h2>
-      <Card className="bg-secondary-bg border-border">
-        <CardContent className="p-12 text-center">
-          <Star className="w-12 h-12 text-secondary-text mx-auto mb-4" />
-          <p className="text-secondary-text mb-4">
-            Suas avaliações aparecerão aqui
-          </p>
-          <p className="text-secondary-text text-sm">
-            Avalie os jogos que você comprou para ajudar outros jogadores
-          </p>
-        </CardContent>
-      </Card>
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <h2 className="text-main-text mb-4 text-2xl font-bold">Minhas Avaliações</h2>
+      
+      {isLoading ? (
+        <div className="flex justify-center py-12">
+          <Loader2 className="w-8 h-8 text-accent-purple animate-spin" />
+        </div>
+      ) : reviews.length === 0 ? (
+        <Card className="bg-secondary-bg border-border">
+          <CardContent className="p-12 text-center">
+            <Star className="w-12 h-12 text-secondary-text mx-auto mb-4 opacity-50" />
+            <p className="text-secondary-text mb-4">
+              Você ainda não avaliou nenhum jogo.
+            </p>
+            <p className="text-secondary-text text-sm">
+              Suas avaliações ajudam outros jogadores a decidirem o que jogar!
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid gap-4">
+          {reviews.map((review, idx) => (
+            <div key={idx} className="bg-secondary-bg p-6 rounded-xl border border-border flex flex-col sm:flex-row gap-6">
+              {/* Capa do jogo na avaliação */}
+              <div className="w-full sm:w-24 h-32 flex-shrink-0 rounded-lg overflow-hidden bg-black/20 border border-border/50">
+                {/* CORREÇÃO: Puxa imagem igual à Home (via nome) */}
+                <ImageWithFallback 
+                  gameName={review.gameName}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+
+              <div className="flex-1">
+                <div className="flex justify-between items-start mb-2">
+                  <h3 className="text-main-text font-bold text-lg hover:text-accent-purple cursor-pointer" onClick={() => onNavigate('details', { gameId: review.fkJogo })}>
+                    {review.gameName}
+                  </h3>
+                  <span className="text-xs text-secondary-text border border-border px-2 py-1 rounded">
+                    {new Date(review.data || Date.now()).toLocaleDateString()}
+                  </span>
+                </div>
+
+                <div className="flex text-yellow-400 mb-3">
+                  {[...Array(5)].map((_, i) => (
+                    <Star
+                      key={i}
+                      className={`w-4 h-4 ${
+                        i < (review.nota || 0)
+                          ? "fill-current"
+                          : "text-gray-600"
+                      }`}
+                    />
+                  ))}
+                </div>
+
+                <p className="text-secondary-text leading-relaxed italic">
+                  "{review.comentario}"
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 
   const renderContent = () => {
     switch (activeSection) {
-      case 'profile':
-        return renderProfileContent();
-      case 'orders':
-        return renderOrdersContent();
-      case 'wishlist':
-        return renderWishlistContent();
-      case 'reviews':
-        return renderReviewsContent();
-      default:
-        return renderProfileContent();
+      case 'profile': return renderProfileContent();
+      case 'orders': return renderOrdersContent();
+      case 'wishlist': return renderWishlistContent();
+      case 'reviews': return renderReviewsContent();
+      default: return renderProfileContent();
     }
   };
 
@@ -318,15 +410,15 @@ export function UserProfilePageNew({ onNavigate }: UserProfilePageNewProps) {
           </Button>
           
           <div className="flex items-center space-x-4 sm:space-x-6">
-            <Avatar name={user.name} size={96} className="border-4 border-accent-purple" />
+            <Avatar name={user.name} size={96} className="border-4 border-accent-purple shadow-lg" />
             <div>
-              <h1 className="text-xl sm:text-2xl lg:text-3xl text-main-text mb-2">{user.name}</h1>
+              <h1 className="text-xl sm:text-2xl lg:text-3xl text-main-text mb-2 font-bold">{user.name}</h1>
               <p className="text-sm sm:text-base text-secondary-text">{user.email}</p>
-              <p className="text-xs sm:text-sm text-secondary-text">
+              <p className="text-xs sm:text-sm text-secondary-text mt-1">
                 Membro desde {new Date(user.joinDate).toLocaleDateString('pt-BR')}
               </p>
               {user.role === 'admin' && (
-                <Badge className="mt-2 bg-accent-purple text-white">
+                <Badge className="mt-3 bg-accent-purple text-white">
                   Administrador
                 </Badge>
               )}
@@ -334,23 +426,26 @@ export function UserProfilePageNew({ onNavigate }: UserProfilePageNewProps) {
           </div>
         </div>
 
-        <div className="flex flex-col lg:flex-row gap-6">
-          {/* Mobile Menu Button */}
+        <div className="flex flex-col lg:flex-row gap-8">
+          {/* Menu Mobile */}
           <div className="lg:hidden">
             <Button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               variant="outline"
-              className="w-full justify-start border-border text-secondary-text hover:text-main-text mb-4"
-              aria-label={isMobileMenuOpen ? 'Fechar menu' : 'Abrir menu'}
+              className="w-full justify-between border-border text-secondary-text hover:text-main-text mb-4"
             >
-              {isMobileMenuOpen ? <X className="w-4 h-4 mr-2" /> : <Menu className="w-4 h-4 mr-2" />}
-              {menuItems.find(item => item.id === activeSection)?.label || 'Menu'}
+              <span className="flex items-center">
+                {isMobileMenuOpen ? <X className="w-4 h-4 mr-2" /> : <Menu className="w-4 h-4 mr-2" />}
+                Menu
+              </span>
+              <span className="text-accent-purple font-medium">
+                {menuItems.find(item => item.id === activeSection)?.label}
+              </span>
             </Button>
             
-            {/* Mobile Menu */}
             {isMobileMenuOpen && (
-              <div className="bg-secondary-bg rounded-lg border border-border p-4 mb-6">
-                <div className="grid grid-cols-2 gap-2">
+              <div className="bg-secondary-bg rounded-lg border border-border p-4 mb-6 shadow-lg animate-in slide-in-from-top-2">
+                <div className="grid grid-cols-1 gap-2">
                   {menuItems.map((item) => {
                     const Icon = item.icon;
                     return (
@@ -366,11 +461,9 @@ export function UserProfilePageNew({ onNavigate }: UserProfilePageNewProps) {
                             ? 'bg-accent-purple hover:bg-accent-hover text-white' 
                             : 'text-secondary-text hover:text-main-text hover:bg-main-bg'
                         }`}
-                        aria-label={item.label}
-                        aria-current={activeSection === item.id ? 'page' : undefined}
                       >
-                        <Icon className="w-4 h-4 mr-2" />
-                        <span className="text-xs sm:text-sm">{item.label}</span>
+                        <Icon className="w-4 h-4 mr-3" />
+                        <span className="text-sm">{item.label}</span>
                       </Button>
                     );
                   })}
@@ -379,10 +472,10 @@ export function UserProfilePageNew({ onNavigate }: UserProfilePageNewProps) {
             )}
           </div>
 
-          {/* Desktop Sidebar */}
+          {/* Sidebar Desktop */}
           <div className="hidden lg:block w-64 flex-shrink-0">
-            <div className="bg-secondary-bg rounded-lg border border-border p-6 sticky top-6">
-              <nav className="space-y-2" aria-label="Menu de perfil">
+            <div className="bg-secondary-bg rounded-lg border border-border p-4 sticky top-6 shadow-sm">
+              <nav className="space-y-1">
                 {menuItems.map((item) => {
                   const Icon = item.icon;
                   return (
@@ -390,13 +483,11 @@ export function UserProfilePageNew({ onNavigate }: UserProfilePageNewProps) {
                       key={item.id}
                       onClick={() => setActiveSection(item.id)}
                       variant={activeSection === item.id ? "default" : "ghost"}
-                      className={`w-full justify-start h-auto p-3 ${
+                      className={`w-full justify-start h-auto p-3 transition-all duration-200 ${
                         activeSection === item.id 
-                          ? 'bg-accent-purple hover:bg-accent-hover text-white' 
+                          ? 'bg-accent-purple hover:bg-accent-hover text-white shadow-md' 
                           : 'text-secondary-text hover:text-main-text hover:bg-main-bg'
                       }`}
-                      aria-label={item.label}
-                      aria-current={activeSection === item.id ? 'page' : undefined}
                     >
                       <Icon className="w-5 h-5 mr-3" />
                       {item.label}
@@ -407,7 +498,7 @@ export function UserProfilePageNew({ onNavigate }: UserProfilePageNewProps) {
             </div>
           </div>
 
-          {/* Main Content */}
+          {/* Conteúdo Principal */}
           <div className="flex-1 min-w-0">
             {renderContent()}
           </div>

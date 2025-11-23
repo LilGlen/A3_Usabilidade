@@ -1,4 +1,5 @@
-import{ createContext, useContext, useState, useEffect, ReactNode, } from "react";
+// src/components/CartContext.tsx
+import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useAPI, CarrinhoItem } from "./useAPI";
 import { useAuth } from "./AuthContext";
 
@@ -100,7 +101,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
       const result = await api.removeFromCart(gameId);
       if (result?.message) {
         await refreshCart();
-        window.location.reload();
+        // CORREÇÃO: setTimeout evita o erro de "código inalcançável"
+        setTimeout(() => window.location.reload(), 50);
         return true;
       }
     } catch (err) {

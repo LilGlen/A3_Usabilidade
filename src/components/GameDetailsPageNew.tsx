@@ -6,6 +6,7 @@ import {
   Loader2,
   ArrowLeft,
   Send,
+  Calendar,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
@@ -16,7 +17,7 @@ import { useAPI } from "./useAPI";
 import { useAuth } from "./AuthContext";
 import { useCart } from "./CartContext";
 import { Avatar } from "./Avatar";
-import { useToast } from "./ToastProvider"; // 1. Importação do hook do Toast
+import { useToast } from "./ToastProvider";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
 
 interface GameDetailsPageProps {
@@ -41,57 +42,63 @@ export function GameDetailsPageNew({
   const api = useAPI();
   const { isAuthenticated } = useAuth();
   const { addToCart } = useCart();
-  const { showToast } = useToast(); // 2. Inicialização do hook
+  const { showToast } = useToast();
 
   useEffect(() => {
-    if (gameId) loadGameDetails();
+    if (!gameId) {
+      setIsLoading(false);
+      return;
+    }
+    loadGameDetails();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameId]);
 
   const loadGameDetails = async () => {
     setIsLoading(true);
     try {
-      const [gameResult, reviewsResult] = await Promise.all([
+      const [gameResult, reviewsResponse] = await Promise.all([
         api.getGame(gameId || ""),
         api.getGameReviews(gameId || ""),
       ]);
 
-      console.log("Game API result:", gameResult);
-      console.log("Reviews API result:", reviewsResult, "Type:", typeof reviewsResult);
+      // Extrai a lista de avaliações e a média atualizada
+      const reviewsList = reviewsResponse?.avaliacoes || [];
+      // Se a API de reviews retornar a média, usamos ela (para atualizar as estrelas em tempo real)
+      // Caso contrário, usamos a do cadastro do jogo.
+      const freshRating = reviewsResponse?.media !== undefined ? reviewsResponse.media : (gameResult?.nota_media || 0);
 
       if (gameResult) {
         const mappedGame = {
           ...gameResult,
           id: gameResult.id,
-          nome: gameResult.titulo || gameResult.nome || gameResult.name,
+          nome: gameResult.nome || gameResult.titulo || gameResult.name,
           descricao: gameResult.descricao || gameResult.description,
           preco: gameResult.preco || gameResult.price || 0,
-          nota_media: gameResult.nota_media || gameResult.rating || 0,
+          nota_media: freshRating, // Nota atualizada
           empresa: gameResult.desenvolvedora || gameResult.empresa || gameResult.company,
           categoria: gameResult.categoria || gameResult.category,
-          imagem_url: gameResult.imagem_url || gameResult.image || "",
+          imagem_url: gameResult.imagem_url || undefined,
         };
         setGame(mappedGame);
       } else {
         setGame(null);
       }
 
-      if (Array.isArray(reviewsResult)) {
-        const mappedReviews = reviewsResult.map((r: any) => ({
-          ...r,
-          nota: r.nota || r.rating,
-          comentario: r.comentario || r.comment,
-          usuario: r.usuario || r.userName || "Usuário",
-          hasSpoilers: r.spoilers || false,
+      if (Array.isArray(reviewsList)) {
+        const mappedReviews = reviewsList.map((review: any) => ({
+          id: review.id,
+          usuario: review.usuario?.nome || review.nome_usuario || "Usuário",
+          nota: review.nota || review.rating || 0,
+          comentario: review.comentario || review.comment || "",
+          hasSpoilers: review.spoilers || review.hasSpoilers || false,
+          data: review.data_criacao || review.created_at || new Date().toISOString(),
         }));
         setReviews(mappedReviews);
       } else {
-        console.warn("Reviews não é um array; definindo como vazio:", reviewsResult);
         setReviews([]);
       }
     } catch (err) {
       console.error("Error loading game details:", err);
-      // 3. Substituição dos toasts de erro
       showToast({ 
         type: "error", 
         title: "Erro", 
@@ -120,18 +127,17 @@ export function GameDetailsPageNew({
 
     const result = await addToCart(Number(game.id));
     
-    // 4. Lógica de feedback do carrinho usando showToast
     if (result === true) {
       showToast({ 
         type: "success", 
         title: "Adicionado!", 
-        message: `${game.nome || "Jogo"} adicionado ao carrinho.` 
+        message: `${game.nome} adicionado ao carrinho.` 
       });
     } else if (result === "already-in-cart") {
       showToast({ 
         type: "info", 
         title: "Atenção", 
-        message: `${game.nome || "Jogo"} já está no carrinho!` 
+        message: `${game.nome} já está no carrinho!` 
       });
     } else {
       showToast({ 
@@ -159,17 +165,18 @@ export function GameDetailsPageNew({
     setIsAddingToWishlist(true);
     try {
       const result = await api.addToWishlist(Number(game.id));
+      
       if (result?.item) {
         showToast({ 
           type: "success", 
-          title: "Lista de Desejos", 
-          message: `${game.nome || "Jogo"} salvo na sua lista!` 
+          title: "Sucesso", 
+          message: "Item adicionado a lista de desejo"
         });
       } else {
         showToast({ 
           type: "error", 
           title: "Erro", 
-          message: "Falha ao salvar na lista de desejos." 
+          message: "Não foi possível adicionar a lista de desejos"
         });
       }
     } catch (err: any) {
@@ -177,14 +184,14 @@ export function GameDetailsPageNew({
       if (err?.status === 409) {
         showToast({ 
           type: "info", 
-          title: "Já salvo", 
-          message: `${game.nome || "Jogo"} já está na sua lista!` 
+          title: "Atenção", 
+          message: "Item já adicionado a lista de desejos"
         });
       } else {
         showToast({ 
           type: "error", 
           title: "Erro", 
-          message: "Erro ao adicionar à lista de desejos." 
+          message: "Não foi possível adicionar a lista de desejos"
         });
       }
     } finally {
@@ -202,10 +209,7 @@ export function GameDetailsPageNew({
       });
       return;
     }
-    if (!gameId) {
-      showToast({ type: "error", title: "Erro", message: "ID do jogo inválido" });
-      return;
-    }
+    if (!gameId) return;
     if (userRating === 0) {
       showToast({ 
         type: "warning", 
@@ -223,30 +227,38 @@ export function GameDetailsPageNew({
         comentario: userComment,
       });
 
-      if (result?.review) {
+      if (result?.review || result?.message) {
         showToast({ 
           type: "success", 
           title: "Sucesso!", 
-          message: "Sua avaliação foi enviada." 
+          message: "Avaliação encaminhada com sucesso"
         });
         setUserRating(0);
         setUserComment("");
         setHasSpoilers(false);
-        await loadGameDetails();
+        await loadGameDetails(); // Recarrega para atualizar a lista e média
       } else {
         showToast({ 
           type: "error", 
           title: "Erro", 
-          message: "Não foi possível enviar a avaliação." 
+          message: "Não foi possível avaliar este item" 
         });
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error submitting review:", err);
-      showToast({ 
-        type: "error", 
-        title: "Erro", 
-        message: "Erro ao conectar com o servidor." 
-      });
+      if (err?.status === 400 && err?.body?.message === "Você já avaliou este jogo.") {
+         showToast({ 
+          type: "info", 
+          title: "Atenção", 
+          message: "Item já avaliado"
+        });
+      } else {
+        showToast({ 
+          type: "error", 
+          title: "Erro", 
+          message: "Não foi possível avaliar este item" 
+        });
+      }
     } finally {
       setSubmittingReview(false);
     }
@@ -264,7 +276,9 @@ export function GameDetailsPageNew({
     return (
       <div className="min-h-screen bg-main-bg flex items-center justify-center">
         <Card className="bg-secondary-bg border-border p-8 text-center">
-          <p className="text-main-text mb-4">Jogo não encontrado</p>
+          <p className="text-main-text mb-4">
+            {!gameId ? "ID do jogo não encontrado." : "Jogo não encontrado."}
+          </p>
           <Button
             onClick={() => onNavigate("home")}
             className="bg-accent-purple hover:bg-accent-hover"
@@ -276,17 +290,39 @@ export function GameDetailsPageNew({
     );
   }
 
-  const gameImage =
-    game.imagem_url ||
-    game.image ||
-    "https://images.unsplash.com/photo-1625314887424-9f190599bd56?w=800&h=600";
-
   const mediaItems = [
-    gameImage,
-    "https://images.unsplash.com/photo-1708577269890-12a58e153589?w=800",
-    "https://images.unsplash.com/photo-1705594975210-02cbcc7af5ad?w=800",
-    "https://images.unsplash.com/photo-1723360480597-d21deccaf3d0?w=800",
+    game.imagem_url, // 0: Capa
+    "https://images.unsplash.com/photo-1708577269890-12a58e153589?w=800", // 1
+    "https://images.unsplash.com/photo-1705594975210-02cbcc7af5ad?w=800", // 2
+    "https://images.unsplash.com/photo-1723360480597-d21deccaf3d0?w=800", // 3
   ];
+
+  const renderActiveMedia = () => {
+    if (activeMedia === 0) {
+      return (
+        // Padrão Home Page: Busca no assets-map pelo NOME
+        <ImageWithFallback
+          gameName={game.nome}
+          alt={`${game.nome} - Capa`}
+          className="w-full h-64 sm:h-96 object-cover transition-all duration-300"
+        />
+      );
+    } else {
+      return (
+        <img
+          src={mediaItems[activeMedia]}
+          alt={`Screenshot ${activeMedia}`}
+          className="w-full h-64 sm:h-96 object-cover transition-all duration-300"
+          onError={(e) => {
+            e.currentTarget.src = "https://placehold.co/800x600?text=Sem+Imagem";
+          }}
+        />
+      );
+    }
+  };
+
+  const formattedPrice = (game.preco || 0).toFixed(2).replace('.', ',');
+  const formattedRating = (game.nota_media || 0).toFixed(1).replace('.', ',');
 
   return (
     <div className="bg-main-bg min-h-screen">
@@ -300,147 +336,172 @@ export function GameDetailsPageNew({
         </Button>
 
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 sm:gap-12">
+          
+          {/* COLUNA ESQUERDA */}
           <div className="lg:col-span-3">
-            <div className="bg-secondary-bg rounded-xl overflow-hidden mb-4">
-              <ImageWithFallback
-                src={mediaItems[activeMedia]}
-                alt={`${game.nome || game.name} - Imagem ${activeMedia + 1}`}
-                gameName={game.nome}
-                className="w-full h-64 sm:h-80 object-cover"
-              />
+            <div className="bg-secondary-bg rounded-xl overflow-hidden mb-4 border border-border">
+              {renderActiveMedia()}
             </div>
 
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-4 gap-3">
               {mediaItems.map((m, idx) => (
                 <button
                   key={idx}
                   onClick={() => setActiveMedia(idx)}
-                  className={`cursor-pointer rounded-lg border-2 ${
+                  className={`relative overflow-hidden rounded-lg border-2 transition-all duration-200 ${
                     activeMedia === idx
-                      ? "border-accent-purple"
-                      : "border-transparent hover:border-accent-purple"
+                      ? "border-accent-purple opacity-100 scale-105"
+                      : "border-transparent hover:border-accent-purple/50 opacity-70 hover:opacity-100"
                   }`}
                 >
-                  <ImageWithFallback
-                    src={m}
-                    alt={`Miniatura ${idx + 1}`}
-                    gameName={game.nome}
-                    className="w-full h-16 sm:h-20 object-cover rounded-lg"
-                  />
+                  {idx === 0 ? (
+                    <ImageWithFallback
+                      gameName={game.nome}
+                      alt="Miniatura Capa"
+                      className="w-full h-20 sm:h-24 object-cover"
+                    />
+                  ) : (
+                    <img
+                      src={m}
+                      alt={`Miniatura ${idx}`}
+                      className="w-full h-20 sm:h-24 object-cover"
+                    />
+                  )}
                 </button>
               ))}
             </div>
           </div>
 
+          {/* COLUNA DIREITA */}
           <div className="lg:col-span-2">
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl text-main-text mb-2">
-              {game.nome || game.name}
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-main-text mb-2 leading-tight">
+              {game.nome}
             </h1>
-            <p className="text-secondary-text mb-4">
-              Por{" "}
-              <span className="text-main-text">
-                {game.empresa || game.company}
+            <p className="text-secondary-text mb-6 text-lg">
+              <span className="font-semibold text-accent-purple">
+                {game.empresa}
               </span>{" "}
-              | {game.categoria || game.category}
+              • {game.categoria}
             </p>
 
-            <div className="flex items-center mb-6">
+            <div className="flex items-center mb-8 bg-secondary-bg/50 p-3 rounded-lg w-fit border border-border/50">
               <div className="flex text-yellow-400">
                 {[...Array(5)].map((_, i) => (
                   <Star
                     key={i}
                     className={`w-5 h-5 ${
-                      i < Math.round(game.nota_media || game.rating || 0)
+                      i < Math.round(game.nota_media || 0)
                         ? "fill-current"
                         : "text-gray-600"
                     }`}
                   />
                 ))}
               </div>
-              <span className="ml-2 text-secondary-text">
-                {(game.nota_media || game.rating)?.toFixed?.(1) || "0.0"} (
-                {reviews.length} avaliações)
+              <span className="ml-3 text-main-text font-medium">
+                {formattedRating} 
+                <span className="text-secondary-text ml-1 text-sm font-normal">
+                  ({reviews.length} avaliações)
+                </span>
               </span>
             </div>
 
-            <div className="bg-secondary-bg p-4 sm:p-6 rounded-xl">
-              <p className="text-3xl text-main-text mb-6">
-                R$ {(game.preco || game.price || 0).toFixed(2)}
+            <div className="bg-secondary-bg p-6 rounded-xl border border-border shadow-sm">
+              <p className="text-4xl font-bold text-main-text mb-8">
+                R$ {formattedPrice}
               </p>
 
-              <Button
-                className="w-full bg-accent-purple hover:bg-accent-hover mb-4"
-                onClick={handleAddToCart}
-              >
-                <ShoppingCart className="w-5 h-5 mr-2" /> Adicionar ao Carrinho
-              </Button>
+              <div className="flex flex-col gap-3">
+                <Button
+                  className="w-full bg-accent-purple hover:bg-accent-hover text-white py-6 text-lg shadow-lg shadow-accent-purple/20 transition-all hover:scale-[1.02]"
+                  onClick={handleAddToCart}
+                >
+                  <ShoppingCart className="w-6 h-6 mr-2" /> 
+                  Adicionar ao Carrinho
+                </Button>
 
-              <Button
-                variant="outline"
-                className="w-full border-secondary-text text-secondary-text"
-                onClick={handleAddToWishlist}
-                disabled={isAddingToWishlist}
-              >
-                {isAddingToWishlist ? (
-                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                ) : (
-                  <Heart className="w-5 h-5 mr-2" />
-                )}
-                Adicionar à Lista de Desejos
-              </Button>
+                <Button
+                  variant="outline"
+                  className="w-full border-secondary-text/30 text-secondary-text hover:text-main-text hover:bg-secondary-bg hover:border-accent-purple/50 py-6 text-lg transition-colors"
+                  onClick={handleAddToWishlist}
+                  disabled={isAddingToWishlist}
+                >
+                  {isAddingToWishlist ? (
+                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                  ) : (
+                    <Heart className="w-5 h-5 mr-2" />
+                  )}
+                  Lista de Desejos
+                </Button>
+              </div>
             </div>
           </div>
 
-          <div className="lg:col-span-5 mt-8">
-            <Tabs defaultValue="descricao">
-              <TabsList className="grid grid-cols-3 border-b border-border">
-                <TabsTrigger value="descricao">Descrição</TabsTrigger>
-                <TabsTrigger value="requisitos">Requisitos</TabsTrigger>
-                <TabsTrigger value="avaliacoes">
+          {/* TABS */}
+          <div className="lg:col-span-5 mt-12">
+            <Tabs defaultValue="descricao" className="w-full">
+              <TabsList className="w-full justify-start bg-transparent border-b border-border p-0 h-auto gap-8 rounded-none">
+                <TabsTrigger 
+                  value="descricao" 
+                  className="rounded-none border-b-2 border-transparent data-[state=active]:border-accent-purple data-[state=active]:bg-transparent data-[state=active]:text-accent-purple pb-4 text-lg px-0 transition-colors hover:text-main-text"
+                >
+                  Descrição
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="requisitos"
+                  className="rounded-none border-b-2 border-transparent data-[state=active]:border-accent-purple data-[state=active]:bg-transparent data-[state=active]:text-accent-purple pb-4 text-lg px-0 transition-colors hover:text-main-text"
+                >
+                  Requisitos
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="avaliacoes"
+                  className="rounded-none border-b-2 border-transparent data-[state=active]:border-accent-purple data-[state=active]:bg-transparent data-[state=active]:text-accent-purple pb-4 text-lg px-0 transition-colors hover:text-main-text"
+                >
                   Avaliações ({reviews.length})
                 </TabsTrigger>
               </TabsList>
 
-              <TabsContent value="descricao" className="py-8">
-                <p className="text-secondary-text leading-relaxed">
-                  {game.descricao ||
-                    game.description ||
-                    "Este jogo não possui descrição disponível."}
-                </p>
-                {game.features && (
-                  <ul className="list-disc list-inside mt-6 text-secondary-text">
-                    {game.features.map((f: string, i: number) => (
-                      <li key={i}>{f}</li>
-                    ))}
-                  </ul>
-                )}
+              <TabsContent value="descricao" className="py-8 animate-in fade-in-50 duration-500">
+                <div className="prose prose-invert max-w-none">
+                  <p className="text-secondary-text leading-relaxed text-lg text-pretty">
+                    {game.descricao || "Este jogo não possui descrição disponível."}
+                  </p>
+                </div>
               </TabsContent>
 
               <TabsContent value="requisitos" className="py-8">
-                <p className="text-secondary-text">Requisitos fixos mockados</p>
+                <div className="bg-secondary-bg p-6 rounded-lg border border-border">
+                  <h3 className="text-main-text font-bold mb-4 text-lg">Requisitos Mínimos</h3>
+                  <ul className="space-y-2 text-secondary-text">
+                    <li><span className="font-semibold text-main-text">Sistema:</span> Windows 10 64-bit</li>
+                    <li><span className="font-semibold text-main-text">Processador:</span> Intel Core i5 ou equivalente</li>
+                    <li><span className="font-semibold text-main-text">Memória:</span> 8 GB RAM</li>
+                    <li><span className="font-semibold text-main-text">Gráficos:</span> NVIDIA GTX 1060 / AMD Radeon RX 580</li>
+                  </ul>
+                </div>
               </TabsContent>
 
               <TabsContent value="avaliacoes" className="py-8">
                 {isAuthenticated && (
                   <form
                     onSubmit={handleSubmitReview}
-                    className="bg-secondary-bg p-6 rounded-xl mb-8"
+                    className="bg-secondary-bg p-6 rounded-xl mb-8 border border-border shadow-sm"
                   >
-                    <div className="mb-4">
-                      <label className="text-secondary-text">Sua nota:</label>
-                      <div className="flex mt-2">
+                    <h3 className="text-main-text font-bold mb-6 text-xl">Escreva sua análise</h3>
+                    <div className="mb-6">
+                      <label className="text-secondary-text block mb-3 text-sm font-semibold">Sua avaliação</label>
+                      <div className="flex gap-2">
                         {[1, 2, 3, 4, 5].map((s) => (
                           <button
                             type="button"
                             key={s}
                             onClick={() => setUserRating(s)}
-                            className="p-1"
+                            className="transition-all duration-200 hover:scale-110 focus:outline-none"
                           >
                             <Star
-                              className={`w-6 h-6 ${
+                              className={`w-10 h-10 ${
                                 s <= userRating
-                                  ? "text-yellow-400 fill-current"
-                                  : "text-gray-600"
+                                  ? "text-yellow-400 fill-current drop-shadow-lg"
+                                  : "text-gray-500 hover:text-yellow-300"
                               }`}
                             />
                           </button>
@@ -448,89 +509,91 @@ export function GameDetailsPageNew({
                       </div>
                     </div>
 
-                    <Textarea
-                      value={userComment}
-                      onChange={(e) => setUserComment(e.target.value)}
-                      placeholder="Escreva sua avaliação..."
-                      className="bg-main-bg border border-border text-main-text mb-4"
-                    />
-
-                    <label className="flex items-center gap-2 text-secondary-text">
-                      <input
-                        type="checkbox"
-                        checked={hasSpoilers}
-                        onChange={(e) => setHasSpoilers(e.target.checked)}
+                    <div className="mb-6">
+                      <Textarea
+                        value={userComment}
+                        onChange={(e) => setUserComment(e.target.value)}
+                        placeholder="Compartilhe sua experiência com este jogo..."
+                        className="bg-main-bg border border-border text-main-text min-h-[120px] resize-none focus:ring-2 focus:ring-accent-purple/30 transition-all"
+                        maxLength={500}
                       />
-                      Contém spoilers
-                    </label>
+                    </div>
 
-                    <Button
-                      type="submit"
-                      className="mt-4 bg-accent-purple hover:bg-accent-hover"
-                      disabled={submittingReview}
-                    >
-                      {submittingReview ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Enviando...
-                        </>
-                      ) : (
-                        <>
-                          <Send className="w-4 h-4 mr-2" />
-                          Enviar Avaliação
-                        </>
-                      )}
-                    </Button>
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                      <label className="flex items-center gap-3 text-secondary-text cursor-pointer hover:text-main-text transition-colors select-none">
+                        <input
+                          type="checkbox"
+                          checked={hasSpoilers}
+                          onChange={(e) => setHasSpoilers(e.target.checked)}
+                          className="w-5 h-5 rounded border-border bg-main-bg text-accent-purple focus:ring-accent-purple"
+                        />
+                        <span>Contém spoilers</span>
+                      </label>
+
+                      <Button
+                        type="submit"
+                        className="bg-accent-purple hover:bg-accent-hover px-8 py-3 text-base font-semibold min-w-[140px] shadow-lg shadow-accent-purple/20"
+                        disabled={submittingReview || userRating === 0}
+                      >
+                        {submittingReview ? (
+                          <>
+                            <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                            Enviando...
+                          </>
+                        ) : (
+                          <>
+                            <Send className="w-5 h-5 mr-2" />
+                            Publicar
+                          </>
+                        )}
+                      </Button>
+                    </div>
                   </form>
                 )}
 
                 {reviews.length === 0 ? (
-                  <p className="text-secondary-text text-center">
-                    Nenhuma avaliação ainda.
-                  </p>
+                  <div className="text-center py-16 bg-secondary-bg/30 rounded-xl border-2 border-dashed border-border">
+                    <p className="text-secondary-text text-lg">Nenhuma avaliação ainda.</p>
+                  </div>
                 ) : (
-                  reviews.map((review, idx) => (
-                    <div key={idx} className="border-b border-border py-4">
-                      <div className="flex gap-3 items-center">
-                        <Avatar
-                          name={review.usuario || "Usuário"}
-                          size={40}
-                        />
-                        <div>
-                          <p className="text-main-text">
-                            {review.usuario}
-                          </p>
-                          <div className="flex">
-                            {[...Array(5)].map((_, i) => (
-                              <Star
-                                key={i}
-                                className={`w-3 h-3 ${
-                                  i < (review.nota || 0)
-                                    ? "fill-current text-yellow-400"
-                                    : "text-gray-600"
-                                }`}
-                              />
-                            ))}
+                  <div className="space-y-4">
+                    {reviews.map((review, idx) => (
+                      <div key={review.id || idx} className="bg-secondary-bg p-6 rounded-xl border border-border">
+                        <div className="flex justify-between items-start mb-4">
+                          <div className="flex gap-4 items-center">
+                            <Avatar name={review.usuario || "Usuário"} size={48} />
+                            <div>
+                              <p className="text-main-text font-bold text-lg">{review.usuario}</p>
+                              <div className="flex text-yellow-400 mt-1">
+                                {[...Array(5)].map((_, i) => (
+                                  <Star
+                                    key={i}
+                                    className={`w-4 h-4 ${
+                                      i < (review.nota || 0) ? "fill-current" : "text-gray-600"
+                                    }`}
+                                  />
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Calendar className="w-3 h-3 text-secondary-text" />
+                            <span className="text-xs text-secondary-text">
+                                {new Date(review.data).toLocaleDateString()}
+                            </span>
                           </div>
                         </div>
+                        {review.hasSpoilers ? (
+                          <details className="group">
+                            <summary className="cursor-pointer text-yellow-500 font-medium">⚠️ Alerta de Spoiler (Clique para ver)</summary>
+                            <p className="mt-3 text-secondary-text">{review.comentario}</p>
+                          </details>
+                        ) : (
+                          <p className="text-secondary-text">{review.comentario}</p>
+                        )}
                       </div>
-
-                      {review.hasSpoilers ? (
-                        <details className="bg-yellow-500/10 border border-yellow-500/30 p-4 mt-3 rounded">
-                          <summary className="cursor-pointer">
-                            ⚠️ Contém spoilers
-                          </summary>
-                          <p className="text-secondary-text mt-3">
-                            {review.comentario}
-                          </p>
-                        </details>
-                      ) : (
-                        <p className="text-secondary-text mt-3">
-                          {review.comentario}
-                        </p>
-                      )}
-                    </div>
-                  ))
+                    ))}
+                  </div>
                 )}
               </TabsContent>
             </Tabs>
