@@ -1,6 +1,15 @@
 # SYNTHX - Loja Digital de Jogos
 
-![SYNTHXLogo](https://res.cloudinary.com/duu2yjyc7/image/upload/v1763853194/51b39ac868a401500b18dd358f02e1e4ae10abe0_jwbdgd.png)
+<p align="center">
+  <img 
+    src="https://res.cloudinary.com/duu2yjyc7/image/upload/v1763853194/51b39ac868a401500b18dd358f02e1e4ae10abe0_jwbdgd.png" 
+    alt="SYNTHX Logo" 
+    width="220"
+  />
+</p>
+
+<br>
+
 
 ## 🎮 Sobre o Projeto
 
