@@ -314,7 +314,7 @@ export function HomePage({ onNavigate, searchTerm }: HomePageProps) {
           <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/40 to-transparent"></div>
           <div className="relative z-10 px-8 py-6 max-w-md">
             <h1 className="text-white font-bold text-3xl md:text-4xl mb-3 leading-tight">
-              A Sua Nova Biblioteca Digital
+              Sua jornada gamer começa aqui.
             </h1>
             <p className="text-gray-300 text-lg mb-6">
               Descubra os melhores jogos, de clássicos a lançamentos.
