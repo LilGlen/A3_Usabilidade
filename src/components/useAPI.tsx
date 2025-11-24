@@ -15,7 +15,7 @@ import {
   REPORT_SALES_ENDPOINT
 } from "../types/api-endpoints";
 
-// --- INTERFACES (Incrementadas conforme solicitado) ---
+// --- INTERFACES (Mantidas e Incrementadas) ---
 
 export interface CarrinhoItem {
   id: number;
@@ -57,6 +57,35 @@ export interface CheckoutResponse {
   };
 }
 
+export interface Review {
+  id: number;
+  fk_jogo: number;
+  fk_usuario: number;
+  nota: number;
+  comentario: string;
+  spoilers: boolean;
+  data_criacao: string;
+  usuario?: {
+    id: number;
+    nome: string;
+    email: string;
+  };
+}
+
+export interface WishlistItem {
+  id: number;
+  fk_jogo: number;
+  fk_usuario: number;
+  data_adicao: string;
+  jogo: {
+    id: number;
+    nome: string;
+    preco: number;
+    imagem_url: string;
+    desconto?: number;
+  };
+}
+
 // --- HOOK PRINCIPAL ---
 
 export function useAPI() {
@@ -81,6 +110,8 @@ export function useAPI() {
           ? endpoint
           : `/${endpoint}`;
         const url = `${API_URL}${normalizedEndpoint}`;
+
+        console.log(`🔄 API Request: ${options.method || 'GET'} ${url}`);
 
         const resp = await fetch(url, { ...options, headers });
 
@@ -114,12 +145,7 @@ export function useAPI() {
     [token]
   );
 
-  // --- JOGOS ---
-  const getAllGames = useCallback(
-    () => makeRequest<any>(GAME_ENDPOINT),
-    [makeRequest]
-  );
-
+  // --- JOGOS (PUBLICO & DETALHES) ---
   const getGames = useCallback(
     ({ page = 1, limit = 20 }) =>
       makeRequest<any>(`${GAME_ENDPOINT_PUBLIC}?page=${page}&limit=${limit}`),
@@ -128,6 +154,12 @@ export function useAPI() {
 
   const getGame = useCallback(
     (id: string | number) => makeRequest<any>(`${GAME_ENDPOINT}/${id}`),
+    [makeRequest]
+  );
+
+  // --- JOGOS (ADMINISTRATIVO - Novas Funções) ---
+  const getAllGames = useCallback(
+    () => makeRequest<any>(GAME_ENDPOINT),
     [makeRequest]
   );
 
@@ -146,9 +178,14 @@ export function useAPI() {
     [makeRequest]
   );
 
-  // --- EMPRESAS ---
+  // --- EMPRESAS (ADMINISTRATIVO - Novas Funções) ---
   const getCompanies = useCallback(
     () => makeRequest<any>(ENTERPRISE_BASE_ENDPOINT || "/empresas"),
+    [makeRequest]
+  );
+  
+  const getCompany = useCallback(
+    (id: string | number) => makeRequest<any>(`${ENTERPRISE_BASE_ENDPOINT || "/empresas"}/${id}`),
     [makeRequest]
   );
 
@@ -167,7 +204,7 @@ export function useAPI() {
     [makeRequest]
   );
 
-  // --- CATEGORIAS ---
+  // --- CATEGORIAS (ADMINISTRATIVO - Novas Funções) ---
   const getCategories = useCallback(
     () => makeRequest<any>(CATEGORIES_BASE_ENDPOINT || "/categorias"),
     [makeRequest]
@@ -211,6 +248,7 @@ export function useAPI() {
     [makeRequest]
   );
 
+  // Checkout (Faltava no seu código original, mas é usado no CheckoutPage)
   const checkout = useCallback(
     (paymentMethod: string) =>
       makeRequest<CheckoutResponse>("/vendas/checkout", {
@@ -227,6 +265,13 @@ export function useAPI() {
     [makeRequest]
   );
 
+  // Função getAllReviews para o AdminPage
+  const getAllReviews = useCallback(
+    () => makeRequest<any[]>(RATE_BASE_ENDPOINT),
+    [makeRequest]
+  );
+
+  // Função getUserReviews (Reimplementada corretamente)
   const getUserReviews = useCallback(async () => {
     try {
       const allReviews = await makeRequest<any[]>(RATE_BASE_ENDPOINT);
@@ -238,7 +283,7 @@ export function useAPI() {
       );
       return userReviews;
     } catch (error) {
-      console.error("Erro ao buscar avaliações:", error);
+      console.error("Erro ao buscar avaliações do usuário:", error);
       return [];
     }
   }, [makeRequest, user?.id]);
@@ -281,40 +326,53 @@ export function useAPI() {
     () => makeRequest<any[]>(ORDERS_ENDPOINT), 
     [makeRequest]
   );
+  
+  // Função getAllPurchases/Sales para o AdminPage
+  const getAllSales = useCallback(
+    () => makeRequest<any[]>(ORDERS_ENDPOINT),
+    [makeRequest]
+  );
 
   // --- RELATÓRIOS ---
   const getBestSellers = useCallback(
     (top: number = 5) => makeRequest<any[]>(`${REPORT_SALES_ENDPOINT || "/relatorios/jogos-mais-vendidos"}?top=${top}`),
     [makeRequest]
   );
+  
+  // Função para obter estatísticas gerais (pode ser mockada ou calculada no front se o back não tiver)
+  const getStatistics = useCallback(async () => {
+      // Se o backend não tiver esse endpoint específico, o AdminPageComplete calcula no front
+      // Mas deixamos a chamada aqui caso exista ou seja criada
+      return makeRequest<any>("/relatorios/estatisticas");
+  }, [makeRequest]);
 
   return useMemo(
     () => ({
       // Jogos
       getGames, getGame, getAllGames, createGame, updateGame, deleteGame,
       // Empresas
-      getCompanies, createCompany, updateCompany, deleteCompany,
+      getCompanies, getCompany, createCompany, updateCompany, deleteCompany,
       // Categorias
       getCategories, createCategory, updateCategory, deleteCategory,
       // Carrinho
       getCart, addToCart, removeFromCart, checkout,
       // Avaliações
-      getGameReviews, getUserReviews, createReview,
+      getGameReviews, getUserReviews, getAllReviews, createReview,
       // Wishlist
       getWishlist, addToWishlist, removeFromWishlist,
       // Histórico
-      getPurchaseHistory,
+      getPurchaseHistory, getAllSales, getAllPurchases: getAllSales, // Alias para compatibilidade
       // Relatórios
-      getBestSellers
+      getBestSellers, getStatistics
     }),
     [
       getGames, getGame, getAllGames, createGame, updateGame, deleteGame,
-      getCompanies, createCompany, updateCompany, deleteCompany,
+      getCompanies, getCompany, createCompany, updateCompany, deleteCompany,
       getCategories, createCategory, updateCategory, deleteCategory,
       getCart, addToCart, removeFromCart, checkout,
-      getGameReviews, getUserReviews, createReview,
+      getGameReviews, getUserReviews, getAllReviews, createReview,
       getWishlist, addToWishlist, removeFromWishlist,
-      getPurchaseHistory, getBestSellers
+      getPurchaseHistory, getAllSales, getBestSellers, getStatistics
     ]
   );
 }
