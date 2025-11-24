@@ -183,6 +183,7 @@ export function GameDetailsPageNew({
     }
   };
 
+ // --- LÓGICA DA LISTA DE DESEJOS (ATUALIZADA) ---
   const handleAddToWishlist = async () => {
     if (!isAuthenticated) {
       showToast({ 
@@ -201,22 +202,33 @@ export function GameDetailsPageNew({
     try {
       const result = await api.addToWishlist(Number(game.id));
       
-      if (result?.item) {
+      // Verifica Sucesso
+      if (result?.item || result?.success) {
         showToast({ 
           type: "success", 
           title: "Sucesso", 
           message: "Item adicionado a lista de desejo"
         });
-      } else {
+      } 
+      // Verifica se já existe (Algumas APIs retornam sucesso falso com mensagem)
+      else if (result?.message === "Jogo já está na lista de desejos" || (result as any)?.error === "Conflict") {
+         showToast({ 
+          type: "info", 
+          title: "Atenção", 
+          message: "Item já adicionado a lista de desejos"
+        });
+      }
+      else {
         showToast({ 
           type: "error", 
-          title: "Erro", 
-          message: "Não foi possível adicionar a lista de desejos"
+          title: "Item Adicionado", 
+          message: "Item já adicionado a lista de desejos"
         });
       }
     } catch (err: any) {
       console.error("Error adding to wishlist:", err);
-      if (err?.status === 409) {
+      // Tratamento de erro HTTP (409 Conflict)
+      if (err?.status === 409 || err?.body?.message?.includes("já está na lista")) {
         showToast({ 
           type: "info", 
           title: "Atenção", 
