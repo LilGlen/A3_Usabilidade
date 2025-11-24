@@ -10,9 +10,12 @@ import {
   WISHLIST_BASE_ENDPOINT,
   RATE_BASE_ENDPOINT,
   ORDERS_ENDPOINT,
-  ENTERPRISE_BASE_ENDPOINT, // Certifique-se de que existe ou use string direta
-  CATEGORIES_BASE_ENDPOINT, // Certifique-se de que existe ou use string direta
+  ENTERPRISE_BASE_ENDPOINT,
+  CATEGORIES_BASE_ENDPOINT,
+  REPORT_SALES_ENDPOINT
 } from "../types/api-endpoints";
+
+// --- INTERFACES (Incrementadas conforme solicitado) ---
 
 export interface CarrinhoItem {
   id: number;
@@ -43,7 +46,6 @@ export interface RemoveFromCartResponse {
   message: string;
 }
 
-// Interface para o checkout
 export interface CheckoutResponse {
   success?: boolean;
   message: string;
@@ -54,6 +56,8 @@ export interface CheckoutResponse {
     id: string;
   };
 }
+
+// --- HOOK PRINCIPAL ---
 
 export function useAPI() {
   const { token, user } = useAuth();
@@ -86,20 +90,16 @@ export function useAPI() {
         try {
           data = await resp.clone().json();
         } catch (_) {
-          // Ignora erro de parse se não for JSON
+          // Ignora erro de parse caso não seja JSON
         }
 
         if (!resp.ok) {
           console.error("API ERROR:", { url, status: resp.status, body: data });
-          if (data?.message) {
-            return data as T; // Retorna o erro estruturado se houver mensagem
-          }
-          // Se for erro genérico, tenta retornar data ou null
-          return (data || null) as T; 
+          if (data?.message) return data as T;
+          return (data || null) as T;
         }
 
-        // TRATAMENTO DE SUCESSO:
-        // Adiciona success: true APENAS se for um objeto plano (não array, não null)
+        // Tratamento de sucesso para garantir compatibilidade com estruturas do backend
         if (resp.ok && typeof data === 'object' && data !== null && !Array.isArray(data)) {
            return { success: true, ...data } as T;
         }
@@ -107,16 +107,14 @@ export function useAPI() {
         return data as T;
       } catch (err: any) {
         console.error("CONNECTION ERROR:", err);
-        if (err?.body?.message) {
-          return err.body as T;
-        }
+        if (err?.body?.message) return err.body as T;
         return null;
       }
     },
     [token]
   );
 
-  // --- JOGOS (PUBLICO & DETALHES) ---
+  // --- JOGOS ---
   const getAllGames = useCallback(
     () => makeRequest<any>(GAME_ENDPOINT),
     [makeRequest]
@@ -133,7 +131,6 @@ export function useAPI() {
     [makeRequest]
   );
 
-   // --- JOGOS (ADMIN) ---
   const createGame = useCallback(
     (data: any) => makeRequest<any>(GAME_ENDPOINT, { method: "POST", body: JSON.stringify(data) }),
     [makeRequest]
@@ -149,7 +146,7 @@ export function useAPI() {
     [makeRequest]
   );
 
-  // --- EMPRESAS (ADMIN) ---
+  // --- EMPRESAS ---
   const getCompanies = useCallback(
     () => makeRequest<any>(ENTERPRISE_BASE_ENDPOINT || "/empresas"),
     [makeRequest]
@@ -170,7 +167,7 @@ export function useAPI() {
     [makeRequest]
   );
 
-  // --- CATEGORIAS (ADMIN) ---
+  // --- CATEGORIAS ---
   const getCategories = useCallback(
     () => makeRequest<any>(CATEGORIES_BASE_ENDPOINT || "/categorias"),
     [makeRequest]
@@ -214,7 +211,6 @@ export function useAPI() {
     [makeRequest]
   );
 
-  // Checkout
   const checkout = useCallback(
     (paymentMethod: string) =>
       makeRequest<CheckoutResponse>("/vendas/checkout", {
@@ -227,15 +223,13 @@ export function useAPI() {
   // --- AVALIAÇÕES ---
   const getGameReviews = useCallback(
     (jogoId: string | number) =>
-      makeRequest<any>(`${RATE_BASE_ENDPOINT}/media/${jogoId}`), // Alterado para /media/ para pegar lista completa
+      makeRequest<any>(`${RATE_BASE_ENDPOINT}/media/${jogoId}`),
     [makeRequest]
   );
 
-  // GET avaliações do usuário (Filtro no front, já que o back retorna todas na rota base)
   const getUserReviews = useCallback(async () => {
     try {
       const allReviews = await makeRequest<any[]>(RATE_BASE_ENDPOINT);
-      
       if (!Array.isArray(allReviews)) return [];
       
       const userReviews = allReviews.filter(review => 
@@ -244,7 +238,7 @@ export function useAPI() {
       );
       return userReviews;
     } catch (error) {
-      console.error("Erro ao buscar avaliações do usuário:", error);
+      console.error("Erro ao buscar avaliações:", error);
       return [];
     }
   }, [makeRequest, user?.id]);
@@ -284,50 +278,34 @@ export function useAPI() {
 
   // --- HISTÓRICO DE COMPRAS ---
   const getPurchaseHistory = useCallback(
-    () => makeRequest<any[]>(ORDERS_ENDPOINT || "/vendas"), 
+    () => makeRequest<any[]>(ORDERS_ENDPOINT), 
+    [makeRequest]
+  );
+
+  // --- RELATÓRIOS ---
+  const getBestSellers = useCallback(
+    (top: number = 5) => makeRequest<any[]>(`${REPORT_SALES_ENDPOINT || "/relatorios/jogos-mais-vendidos"}?top=${top}`),
     [makeRequest]
   );
 
   return useMemo(
     () => ({
       // Jogos
-      getGames,
-      getGame,
-      getAllGames,
-      createGame,
-      updateGame,
-      deleteGame,
-
+      getGames, getGame, getAllGames, createGame, updateGame, deleteGame,
       // Empresas
-      getCompanies,
-      createCompany,
-      updateCompany,
-      deleteCompany,
-
+      getCompanies, createCompany, updateCompany, deleteCompany,
       // Categorias
-      getCategories,
-      createCategory,
-      updateCategory,
-      deleteCategory,
-
+      getCategories, createCategory, updateCategory, deleteCategory,
       // Carrinho
-      getCart,
-      addToCart,
-      removeFromCart,
-      checkout,
-
+      getCart, addToCart, removeFromCart, checkout,
       // Avaliações
-      getGameReviews,
-      getUserReviews,
-      createReview,
-
+      getGameReviews, getUserReviews, createReview,
       // Wishlist
-      getWishlist,
-      addToWishlist,
-      removeFromWishlist,
-
+      getWishlist, addToWishlist, removeFromWishlist,
       // Histórico
       getPurchaseHistory,
+      // Relatórios
+      getBestSellers
     }),
     [
       getGames, getGame, getAllGames, createGame, updateGame, deleteGame,
@@ -336,7 +314,7 @@ export function useAPI() {
       getCart, addToCart, removeFromCart, checkout,
       getGameReviews, getUserReviews, createReview,
       getWishlist, addToWishlist, removeFromWishlist,
-      getPurchaseHistory,
+      getPurchaseHistory, getBestSellers
     ]
   );
 }

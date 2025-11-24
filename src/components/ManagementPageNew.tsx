@@ -12,7 +12,7 @@ import { PageType } from '../App';
 import { Building2, Tag, Gamepad2, Plus, Edit, Trash2, Save, Loader2, ArrowLeft } from 'lucide-react';
 import { useAPI } from './useAPI';
 import { useAuth } from './AuthContext';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner'; // Importação direta do sonner para simplificar
 
 interface ManagementPageProps {
   onNavigate: (page: PageType) => void;
@@ -57,56 +57,35 @@ export function ManagementPageNew({ onNavigate }: ManagementPageProps) {
 
   useEffect(() => {
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
   const loadData = async () => {
     setIsLoading(true);
     try {
-      if (activeTab === 'companies') {
+      // Carrega Empresas
+      if (activeTab === 'companies' || activeTab === 'games') {
         const result = await api.getCompanies();
-        if (result?.success) {
-          // Remove duplicates by id
-          const uniqueCompanies = Array.from(
-            new Map((result.companies || []).map((c: any) => [c.id, c])).values()
-          );
-          setCompanies(uniqueCompanies);
-        }
-      } else if (activeTab === 'categories') {
+        const list = Array.isArray(result) ? result : (result?.companies || []);
+        // Deduplicar e setar
+        const uniqueCompanies = Array.from(new Map(list.map((c: any) => [c.id, c])).values());
+        setCompanies(uniqueCompanies);
+      } 
+      
+      // Carrega Categorias
+      if (activeTab === 'categories' || activeTab === 'games') {
         const result = await api.getCategories();
-        if (result?.success) {
-          // Remove duplicates by id
-          const uniqueCategories = Array.from(
-            new Map((result.categories || []).map((c: any) => [c.id, c])).values()
-          );
-          setCategories(uniqueCategories);
-        }
-      } else if (activeTab === 'games') {
-        const [gamesResult, companiesResult, categoriesResult] = await Promise.all([
-          api.getGames(),
-          api.getCompanies(),
-          api.getCategories()
-        ]);
-        if (gamesResult?.success) {
-          // Remove duplicates by id
-          const uniqueGames = Array.from(
-            new Map((gamesResult.games || []).map((g: any) => [g.id, g])).values()
-          );
-          setGames(uniqueGames);
-        }
-        if (companiesResult?.success) {
-          // Remove duplicates by id
-          const uniqueCompanies = Array.from(
-            new Map((companiesResult.companies || []).map((c: any) => [c.id, c])).values()
-          );
-          setCompanies(uniqueCompanies);
-        }
-        if (categoriesResult?.success) {
-          // Remove duplicates by id
-          const uniqueCategories = Array.from(
-            new Map((categoriesResult.categories || []).map((c: any) => [c.id, c])).values()
-          );
-          setCategories(uniqueCategories);
-        }
+        const list = Array.isArray(result) ? result : (result?.categories || []);
+        const uniqueCategories = Array.from(new Map(list.map((c: any) => [c.id, c])).values());
+        setCategories(uniqueCategories);
+      } 
+      
+      // Carrega Jogos
+      if (activeTab === 'games') {
+        const result = await api.getAllGames(); // Função correta para Admin
+        const list = Array.isArray(result) ? result : (result?.games || []);
+        const uniqueGames = Array.from(new Map(list.map((g: any) => [g.id, g])).values());
+        setGames(uniqueGames);
       }
     } catch (error) {
       console.error('Error loading data:', error);
@@ -118,7 +97,8 @@ export function ManagementPageNew({ onNavigate }: ManagementPageProps) {
 
   const openDialog = (item: any = null) => {
     setEditingItem(item);
-    setFormData(item || {});
+    // Se for edição, preenche o form. Se for novo, limpa.
+    setFormData(item ? { ...item } : {});
     setDialogOpen(true);
   };
 
@@ -141,26 +121,35 @@ export function ManagementPageNew({ onNavigate }: ManagementPageProps) {
         } else {
           result = await api.createCompany(formData);
         }
-      } else if (activeTab === 'categories') {
-        if (editingItem) {
-          result = await api.updateCategory(editingItem.id, formData);
-        } else {
-          result = await api.createCategory(formData);
-        }
       } else if (activeTab === 'games') {
+        // CORREÇÃO CRUCIAL: O backend espera fkEmpresa e fkCategoria
+        // O formulário usa IDs nos selects agora.
+        const payload = {
+            nome: formData.name || formData.nome,
+            descricao: formData.description || formData.descricao,
+            ano: Number(formData.year || formData.ano),
+            preco: Number(formData.price || formData.preco),
+            desconto: 0, // Padrão
+            fkEmpresa: Number(formData.fkEmpresa), // ID da empresa
+            fkCategoria: Number(formData.fkCategoria), // ID da categoria
+            // Opcional: Se quiser passar URL da imagem, mas o back pode não ter campo pra isso ainda
+            // image: formData.image 
+        };
+
         if (editingItem) {
-          result = await api.updateGame(editingItem.id, formData);
+          result = await api.updateGame(editingItem.id, payload);
         } else {
-          result = await api.createGame(formData);
+          result = await api.createGame(payload);
         }
       }
 
-      if (result?.success) {
+      // Verifica sucesso
+      if (result && (result.success || result.id || result.changes)) {
         toast.success(editingItem ? 'Atualizado com sucesso!' : 'Criado com sucesso!');
         closeDialog();
         await loadData();
       } else {
-        toast.error('Erro ao salvar');
+        toast.error('Erro ao salvar. Verifique os dados.');
       }
     } catch (error) {
       console.error('Error saving:', error);
@@ -170,7 +159,7 @@ export function ManagementPageNew({ onNavigate }: ManagementPageProps) {
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string | number) => {
     if (!confirm('Tem certeza que deseja excluir?')) return;
 
     setIsLoading(true);
@@ -179,13 +168,11 @@ export function ManagementPageNew({ onNavigate }: ManagementPageProps) {
       
       if (activeTab === 'companies') {
         result = await api.deleteCompany(id);
-      } else if (activeTab === 'categories') {
-        result = await api.deleteCategory(id);
       } else if (activeTab === 'games') {
         result = await api.deleteGame(id);
       }
 
-      if (result?.success) {
+      if (result || result === null) {
         toast.success('Excluído com sucesso!');
         await loadData();
       } else {
@@ -199,91 +186,31 @@ export function ManagementPageNew({ onNavigate }: ManagementPageProps) {
     }
   };
 
+  // --- FORMULÁRIO DE EMPRESA ---
   const CompanyForm = () => (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
         <Label htmlFor="company-name" className="text-secondary-text">Nome da Empresa</Label>
         <Input
           id="company-name"
-          value={formData.name || ''}
-          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+          value={formData.name || formData.nome || ''}
+          onChange={(e) => setFormData({ ...formData, name: e.target.value, nome: e.target.value })}
           className="bg-main-bg border-border text-main-text"
-          placeholder="Digite o nome da empresa"
+          placeholder="Ex: Nintendo"
           required
-          aria-label="Nome da empresa"
-        />
-      </div>
-      <div>
-        <Label htmlFor="company-description" className="text-secondary-text">Descrição</Label>
-        <Textarea
-          id="company-description"
-          value={formData.description || ''}
-          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-          className="bg-main-bg border-border text-main-text"
-          placeholder="Descreva a empresa"
-          rows={3}
-          aria-label="Descrição da empresa"
-        />
-      </div>
-      <div>
-        <Label htmlFor="company-founded" className="text-secondary-text">Ano de Fundação</Label>
-        <Input
-          id="company-founded"
-          type="number"
-          value={formData.founded || ''}
-          onChange={(e) => setFormData({ ...formData, founded: e.target.value })}
-          className="bg-main-bg border-border text-main-text"
-          placeholder="2023"
-          required
-          aria-label="Ano de fundação"
         />
       </div>
       <div className="flex justify-end space-x-2">
         <Button type="button" variant="outline" onClick={closeDialog}>Cancelar</Button>
         <Button type="submit" className="bg-accent-purple hover:bg-accent-hover" disabled={isLoading}>
           {isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-          {editingItem ? 'Atualizar' : 'Criar'} Empresa
+          Salvar
         </Button>
       </div>
     </form>
   );
 
-  const CategoryForm = () => (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <Label htmlFor="category-name" className="text-secondary-text">Nome da Categoria</Label>
-        <Input
-          id="category-name"
-          value={formData.name || ''}
-          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-          className="bg-main-bg border-border text-main-text"
-          placeholder="Digite o nome da categoria"
-          required
-          aria-label="Nome da categoria"
-        />
-      </div>
-      <div>
-        <Label htmlFor="category-description" className="text-secondary-text">Descrição</Label>
-        <Textarea
-          id="category-description"
-          value={formData.description || ''}
-          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-          className="bg-main-bg border-border text-main-text"
-          placeholder="Descreva a categoria"
-          rows={3}
-          aria-label="Descrição da categoria"
-        />
-      </div>
-      <div className="flex justify-end space-x-2">
-        <Button type="button" variant="outline" onClick={closeDialog}>Cancelar</Button>
-        <Button type="submit" className="bg-accent-purple hover:bg-accent-hover" disabled={isLoading}>
-          {isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-          {editingItem ? 'Atualizar' : 'Criar'} Categoria
-        </Button>
-      </div>
-    </form>
-  );
-
+  // --- FORMULÁRIO DE JOGO (CORRIGIDO PARA USAR IDs) ---
   const GameForm = () => (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -291,12 +218,10 @@ export function ManagementPageNew({ onNavigate }: ManagementPageProps) {
           <Label htmlFor="game-name" className="text-secondary-text">Nome do Jogo</Label>
           <Input
             id="game-name"
-            value={formData.name || ''}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            value={formData.name || formData.nome || ''}
+            onChange={(e) => setFormData({ ...formData, name: e.target.value, nome: e.target.value })}
             className="bg-main-bg border-border text-main-text"
-            placeholder="Digite o nome do jogo"
             required
-            aria-label="Nome do jogo"
           />
         </div>
         <div>
@@ -305,81 +230,83 @@ export function ManagementPageNew({ onNavigate }: ManagementPageProps) {
             id="game-price"
             type="number"
             step="0.01"
-            value={formData.price || ''}
-            onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) })}
+            value={formData.price || formData.preco || ''}
+            onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value), preco: parseFloat(e.target.value) })}
             className="bg-main-bg border-border text-main-text"
-            placeholder="99.99"
             required
-            aria-label="Preço do jogo"
           />
         </div>
+        <div>
+            <Label htmlFor="game-year" className="text-secondary-text">Ano</Label>
+            <Input
+                id="game-year"
+                type="number"
+                value={formData.year || formData.ano || ''}
+                onChange={(e) => setFormData({ ...formData, year: parseInt(e.target.value), ano: parseInt(e.target.value) })}
+                className="bg-main-bg border-border text-main-text"
+                required
+            />
+        </div>
       </div>
+      
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* SELECT DE EMPRESAS - ENVIA ID */}
         <div>
           <Label htmlFor="game-company" className="text-secondary-text">Empresa</Label>
           <Select
-            value={formData.company || ''}
-            onValueChange={(value) => setFormData({ ...formData, company: value })}
+            value={String(formData.fkEmpresa || formData.fk_empresa || '')}
+            onValueChange={(value) => setFormData({ ...formData, fkEmpresa: value, fk_empresa: value })}
           >
-            <SelectTrigger className="bg-main-bg border-border text-main-text" aria-label="Empresa do jogo">
+            <SelectTrigger className="bg-main-bg border-border text-main-text">
               <SelectValue placeholder="Selecione a empresa" />
             </SelectTrigger>
             <SelectContent className="bg-secondary-bg border-border">
-              {companies.map((company, index) => (
-                <SelectItem key={`company-${company.id}-${index}`} value={company.name} className="text-main-text">
-                  {company.name}
+              {companies.map((company) => (
+                <SelectItem key={company.id} value={String(company.id)} className="text-main-text">
+                  {company.name || company.nome}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
+
+        {/* SELECT DE CATEGORIAS - ENVIA ID */}
         <div>
           <Label htmlFor="game-category" className="text-secondary-text">Categoria</Label>
           <Select
-            value={formData.category || ''}
-            onValueChange={(value) => setFormData({ ...formData, category: value })}
+            value={String(formData.fkCategoria || formData.fk_categoria || '')}
+            onValueChange={(value) => setFormData({ ...formData, fkCategoria: value, fk_categoria: value })}
           >
-            <SelectTrigger className="bg-main-bg border-border text-main-text" aria-label="Categoria do jogo">
+            <SelectTrigger className="bg-main-bg border-border text-main-text">
               <SelectValue placeholder="Selecione a categoria" />
             </SelectTrigger>
             <SelectContent className="bg-secondary-bg border-border">
-              {categories.map((category, index) => (
-                <SelectItem key={`category-${category.id}-${index}`} value={category.name} className="text-main-text">
-                  {category.name}
+              {categories.map((category) => (
+                <SelectItem key={category.id} value={String(category.id)} className="text-main-text">
+                  {category.name || category.nome}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
       </div>
+
       <div>
         <Label htmlFor="game-description" className="text-secondary-text">Descrição</Label>
         <Textarea
           id="game-description"
-          value={formData.description || ''}
-          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+          value={formData.description || formData.descricao || ''}
+          onChange={(e) => setFormData({ ...formData, description: e.target.value, descricao: e.target.value })}
           className="bg-main-bg border-border text-main-text"
-          placeholder="Descreva o jogo"
           rows={4}
-          aria-label="Descrição do jogo"
         />
       </div>
-      <div>
-        <Label htmlFor="game-image" className="text-secondary-text">URL da Imagem</Label>
-        <Input
-          id="game-image"
-          value={formData.image || ''}
-          onChange={(e) => setFormData({ ...formData, image: e.target.value })}
-          className="bg-main-bg border-border text-main-text"
-          placeholder="https://..."
-          aria-label="URL da imagem do jogo"
-        />
-      </div>
+
       <div className="flex justify-end space-x-2">
         <Button type="button" variant="outline" onClick={closeDialog}>Cancelar</Button>
         <Button type="submit" className="bg-accent-purple hover:bg-accent-hover" disabled={isLoading}>
           {isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-          {editingItem ? 'Atualizar' : 'Criar'} Jogo
+          Salvar Jogo
         </Button>
       </div>
     </form>
@@ -392,248 +319,107 @@ export function ManagementPageNew({ onNavigate }: ManagementPageProps) {
           onClick={() => onNavigate('admin')}
           variant="outline"
           className="mb-4 border-border text-secondary-text hover:text-main-text"
-          aria-label="Voltar para painel administrativo"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
           Voltar para Admin
         </Button>
         
-        <h1 className="text-main-text mb-2">Gerenciamento</h1>
-        <p className="text-secondary-text">Gerencie empresas, categorias e jogos</p>
+        <h1 className="text-main-text mb-2 text-2xl font-bold">Gerenciamento de Conteúdo</h1>
+        <p className="text-secondary-text">Adicione, edite ou remova jogos e empresas.</p>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3 bg-secondary-bg">
-          <TabsTrigger value="companies" className="data-[state=active]:bg-accent-purple">
-            <Building2 className="w-4 h-4 mr-2" />
-            Empresas
+        <TabsList className="grid w-full grid-cols-3 bg-secondary-bg border border-border">
+          <TabsTrigger value="companies" className="data-[state=active]:bg-accent-purple data-[state=active]:text-white">
+            <Building2 className="w-4 h-4 mr-2" /> Empresas
           </TabsTrigger>
-          <TabsTrigger value="categories" className="data-[state=active]:bg-accent-purple">
-            <Tag className="w-4 h-4 mr-2" />
-            Categorias
+          <TabsTrigger value="categories" className="data-[state=active]:bg-accent-purple data-[state=active]:text-white">
+            <Tag className="w-4 h-4 mr-2" /> Categorias
           </TabsTrigger>
-          <TabsTrigger value="games" className="data-[state=active]:bg-accent-purple">
-            <Gamepad2 className="w-4 h-4 mr-2" />
-            Jogos
+          <TabsTrigger value="games" className="data-[state=active]:bg-accent-purple data-[state=active]:text-white">
+            <Gamepad2 className="w-4 h-4 mr-2" /> Jogos
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="companies" className="space-y-6">
+        {/* CONTEÚDO EMPRESAS */}
+        <TabsContent value="companies" className="space-y-6 mt-6">
           <div className="flex justify-between items-center">
-            <h2 className="text-main-text">Empresas Cadastradas ({companies.length})</h2>
-            <Button
-              onClick={() => openDialog()}
-              className="bg-accent-purple hover:bg-accent-hover"
-              aria-label="Criar nova empresa"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Nova Empresa
+            <h2 className="text-main-text text-xl">Empresas ({companies.length})</h2>
+            <Button onClick={() => openDialog()} className="bg-accent-purple hover:bg-accent-hover">
+              <Plus className="w-4 h-4 mr-2" /> Nova Empresa
             </Button>
           </div>
-
-          {isLoading ? (
-            <div className="flex justify-center py-12">
-              <Loader2 className="w-8 h-8 text-accent-purple animate-spin" />
-            </div>
-          ) : companies.length === 0 ? (
-            <Card className="bg-secondary-bg border-border">
-              <CardContent className="p-12 text-center">
-                <Building2 className="w-12 h-12 text-secondary-text mx-auto mb-4" />
-                <p className="text-secondary-text">Nenhuma empresa cadastrada</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {/* Lista de Empresas... (mantida estrutura visual) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {companies.map((company) => (
                 <Card key={company.id} className="bg-secondary-bg border-border">
                   <CardHeader>
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <CardTitle className="text-main-text">{company.name}</CardTitle>
-                        <CardDescription className="text-secondary-text">
-                          Fundada em {company.founded}
-                        </CardDescription>
-                      </div>
-                    </div>
+                    <CardTitle className="text-main-text">{company.name || company.nome}</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-secondary-text mb-4">{company.description}</p>
-                    <p className="text-main-text">{company.games || 0} jogos</p>
-                    <div className="flex justify-end space-x-2 mt-4">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => openDialog(company)}
-                        aria-label={`Editar ${company.name}`}
-                      >
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="text-error border-error hover:bg-error hover:text-white"
-                        onClick={() => handleDelete(company.id)}
-                        aria-label={`Excluir ${company.name}`}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </TabsContent>
-
-        <TabsContent value="categories" className="space-y-6">
-          <div className="flex justify-between items-center">
-            <h2 className="text-main-text">Categorias de Jogos ({categories.length})</h2>
-            <Button
-              onClick={() => openDialog()}
-              className="bg-accent-purple hover:bg-accent-hover"
-              aria-label="Criar nova categoria"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Nova Categoria
-            </Button>
-          </div>
-
-          {isLoading ? (
-            <div className="flex justify-center py-12">
-              <Loader2 className="w-8 h-8 text-accent-purple animate-spin" />
-            </div>
-          ) : categories.length === 0 ? (
-            <Card className="bg-secondary-bg border-border">
-              <CardContent className="p-12 text-center">
-                <Tag className="w-12 h-12 text-secondary-text mx-auto mb-4" />
-                <p className="text-secondary-text">Nenhuma categoria cadastrada</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {categories.map((category) => (
-                <Card key={category.id} className="bg-secondary-bg border-border">
-                  <CardHeader>
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <CardTitle className="text-main-text">{category.name}</CardTitle>
-                        <CardDescription className="text-secondary-text">
-                          {category.games || 0} jogos
-                        </CardDescription>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-secondary-text mb-4">{category.description}</p>
                     <div className="flex justify-end space-x-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => openDialog(category)}
-                        aria-label={`Editar ${category.name}`}
-                      >
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="text-error border-error hover:bg-error hover:text-white"
-                        onClick={() => handleDelete(category.id)}
-                        aria-label={`Excluir ${category.name}`}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => openDialog(company)}><Edit className="w-4 h-4" /></Button>
+                      <Button size="sm" variant="outline" className="text-red-500 hover:bg-red-500/10" onClick={() => handleDelete(company.id)}><Trash2 className="w-4 h-4" /></Button>
                     </div>
                   </CardContent>
                 </Card>
               ))}
-            </div>
-          )}
+          </div>
         </TabsContent>
 
-        <TabsContent value="games" className="space-y-6">
+        {/* CONTEÚDO CATEGORIAS (SOMENTE LEITURA) */}
+        <TabsContent value="categories" className="space-y-6 mt-6">
           <div className="flex justify-between items-center">
-            <h2 className="text-main-text">Jogos Cadastrados ({games.length})</h2>
-            <Button
-              onClick={() => openDialog()}
-              className="bg-accent-purple hover:bg-accent-hover"
-              aria-label="Criar novo jogo"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Novo Jogo
-            </Button>
+            <h2 className="text-main-text text-xl">Categorias ({categories.length})</h2>
+             {/* Botão removido pois backend não suporta POST em categorias */}
           </div>
-
-          {isLoading ? (
-            <div className="flex justify-center py-12">
-              <Loader2 className="w-8 h-8 text-accent-purple animate-spin" />
-            </div>
-          ) : games.length === 0 ? (
-            <Card className="bg-secondary-bg border-border">
-              <CardContent className="p-12 text-center">
-                <Gamepad2 className="w-12 h-12 text-secondary-text mx-auto mb-4" />
-                <p className="text-secondary-text">Nenhum jogo cadastrado</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-4">
-              {games.map((game) => (
-                <Card key={game.id} className="bg-secondary-bg border-border">
-                  <CardContent className="p-6">
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
-                      <div>
-                        <h3 className="text-main-text">{game.name}</h3>
-                        <p className="text-secondary-text text-sm">{game.company}</p>
-                      </div>
-                      <div>
-                        <Badge className="bg-accent-purple">{game.category}</Badge>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-accent-purple">R$ {game.price?.toFixed(2)}</p>
-                        <p className="text-secondary-text text-sm">{game.sales || 0} vendas</p>
-                      </div>
-                      <div className="flex justify-end space-x-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => openDialog(game)}
-                          aria-label={`Editar ${game.name}`}
-                        >
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="text-error border-error hover:bg-error hover:text-white"
-                          onClick={() => handleDelete(game.id)}
-                          aria-label={`Excluir ${game.name}`}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {categories.map((category) => (
+                <Card key={category.id} className="bg-secondary-bg border-border opacity-80">
+                  <CardHeader>
+                    <CardTitle className="text-main-text">{category.name || category.nome}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                     <p className="text-xs text-secondary-text italic">Somente Leitura</p>
                   </CardContent>
                 </Card>
               ))}
-            </div>
-          )}
+          </div>
+        </TabsContent>
+
+        {/* CONTEÚDO JOGOS */}
+        <TabsContent value="games" className="space-y-6 mt-6">
+          <div className="flex justify-between items-center">
+            <h2 className="text-main-text text-xl">Jogos ({games.length})</h2>
+            <Button onClick={() => openDialog()} className="bg-accent-purple hover:bg-accent-hover">
+              <Plus className="w-4 h-4 mr-2" /> Novo Jogo
+            </Button>
+          </div>
+           <div className="grid grid-cols-1 gap-4">
+              {games.map((game) => (
+                <Card key={game.id} className="bg-secondary-bg border-border flex flex-row items-center p-4">
+                  <div className="flex-1">
+                    <h3 className="text-main-text font-bold">{game.name || game.nome}</h3>
+                    <p className="text-secondary-text text-sm">R$ {game.price || game.preco}</p>
+                  </div>
+                  <div className="flex space-x-2">
+                      <Button size="sm" variant="outline" onClick={() => openDialog(game)}><Edit className="w-4 h-4" /></Button>
+                      <Button size="sm" variant="outline" className="text-red-500 hover:bg-red-500/10" onClick={() => handleDelete(game.id)}><Trash2 className="w-4 h-4" /></Button>
+                  </div>
+                </Card>
+              ))}
+          </div>
         </TabsContent>
       </Tabs>
 
-      {/* Dialog for creating/editing */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="bg-secondary-bg border-border max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="bg-secondary-bg border-border max-w-2xl max-h-[90vh] overflow-y-auto text-main-text">
           <DialogHeader>
             <DialogTitle className="text-main-text">
-              {editingItem ? 'Editar' : 'Novo'}{' '}
-              {activeTab === 'companies' ? 'Empresa' : activeTab === 'categories' ? 'Categoria' : 'Jogo'}
+              {editingItem ? 'Editar' : 'Novo'} {activeTab === 'companies' ? 'Empresa' : 'Jogo'}
             </DialogTitle>
-            <DialogDescription className="text-secondary-text">
-              Preencha os dados abaixo
-            </DialogDescription>
           </DialogHeader>
           {activeTab === 'companies' && <CompanyForm />}
-          {activeTab === 'categories' && <CategoryForm />}
           {activeTab === 'games' && <GameForm />}
         </DialogContent>
       </Dialog>

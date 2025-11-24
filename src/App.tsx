@@ -4,7 +4,7 @@ import { Footer } from "./components/Footer";
 import { HomePage } from "./components/HomePage";
 import { GameDetailsPageNew } from "./components/GameDetailsPageNew";
 import { AdminPageComplete } from "./components/AdminPageComplete";
-import { UserProfilePageNew } from "./components/UserProfilePageNew";
+import { <UserProfilePageNew></UserProfilePageNew> } from "./components/UserProfilePageNew";
 import { ManagementPageNew } from "./components/ManagementPageNew";
 import { CheckoutPage } from "./components/CheckoutPage";
 import { LandingPage } from "./components/LandingPage";

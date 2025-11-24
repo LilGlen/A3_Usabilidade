@@ -40,7 +40,7 @@ export function GameDetailsPageNew({
   const [isAddingToWishlist, setIsAddingToWishlist] = useState(false);
 
   const api = useAPI();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const { addToCart } = useCart();
   const { showToast } = useToast();
 
@@ -56,15 +56,28 @@ export function GameDetailsPageNew({
   const loadGameDetails = async () => {
     setIsLoading(true);
     try {
+      // 1. Busca o jogo e as reviews
       const [gameResult, reviewsResponse] = await Promise.all([
         api.getGame(gameId || ""),
         api.getGameReviews(gameId || ""),
       ]);
 
-      // Extrai a lista de avaliações e a média atualizada
+      // 2. Busca o nome da empresa se tivermos o ID (fk_empresa)
+      let empresaNome = "Desenvolvedora Desconhecida";
+      if (gameResult && gameResult.fk_empresa) {
+        try {
+          const companyResult = await api.getCompany(gameResult.fk_empresa);
+          if (companyResult && (companyResult.nome || companyResult.name)) {
+            empresaNome = companyResult.nome || companyResult.name;
+          }
+        } catch (e) {
+          console.warn("Não foi possível carregar o nome da empresa");
+        }
+      } else if (gameResult?.empresa) {
+         empresaNome = gameResult.empresa;
+      }
+
       const reviewsList = reviewsResponse?.avaliacoes || [];
-      // Se a API de reviews retornar a média, usamos ela (para atualizar as estrelas em tempo real)
-      // Caso contrário, usamos a do cadastro do jogo.
       const freshRating = reviewsResponse?.media !== undefined ? reviewsResponse.media : (gameResult?.nota_media || 0);
 
       if (gameResult) {
@@ -74,9 +87,9 @@ export function GameDetailsPageNew({
           nome: gameResult.nome || gameResult.titulo || gameResult.name,
           descricao: gameResult.descricao || gameResult.description,
           preco: gameResult.preco || gameResult.price || 0,
-          nota_media: freshRating, // Nota atualizada
-          empresa: gameResult.desenvolvedora || gameResult.empresa || gameResult.company,
-          categoria: gameResult.categoria || gameResult.category,
+          nota_media: freshRating,
+          empresa: empresaNome, // Nome resolvido da empresa
+          categoria: gameResult.categoria || gameResult.category || "Geral",
           imagem_url: gameResult.imagem_url || undefined,
         };
         setGame(mappedGame);
@@ -227,17 +240,37 @@ export function GameDetailsPageNew({
         comentario: userComment,
       });
 
-      if (result?.review || result?.message) {
+      // Verifica sucesso baseado nas respostas possíveis do seu backend
+      if (result?.review || result?.success || result?.message === "Avaliação criada com sucesso!") {
         showToast({ 
           type: "success", 
           title: "Sucesso!", 
           message: "Avaliação encaminhada com sucesso"
         });
+        
+        // Atualização Otimista: Adiciona a review na lista imediatamente
+        const newReview = {
+          id: Date.now(), // ID temporário
+          usuario: user?.name || "Você",
+          nota: userRating,
+          comentario: userComment,
+          hasSpoilers: hasSpoilers,
+          data: new Date().toISOString()
+        };
+        
+        setReviews(prev => [newReview, ...prev]);
         setUserRating(0);
         setUserComment("");
         setHasSpoilers(false);
-        await loadGameDetails(); // Recarrega para atualizar a lista e média
+
+      } else if (result?.message === "Você já avaliou este jogo." || (result as any)?.error === "Você já avaliou este jogo.") {
+         showToast({ 
+          type: "info", 
+          title: "Atenção", 
+          message: "Item já avaliado"
+        });
       } else {
+        // Fallback genérico de erro
         showToast({ 
           type: "error", 
           title: "Erro", 
@@ -246,7 +279,7 @@ export function GameDetailsPageNew({
       }
     } catch (err: any) {
       console.error("Error submitting review:", err);
-      if (err?.status === 400 && err?.body?.message === "Você já avaliou este jogo.") {
+      if (err?.status === 400 && (err?.body?.message === "Você já avaliou este jogo." || err?.body?.error === "Você já avaliou este jogo.")) {
          showToast({ 
           type: "info", 
           title: "Atenção", 
@@ -291,17 +324,17 @@ export function GameDetailsPageNew({
   }
 
   const mediaItems = [
-    game.imagem_url, // 0: Capa
-    "https://images.unsplash.com/photo-1708577269890-12a58e153589?w=800", // 1
-    "https://images.unsplash.com/photo-1705594975210-02cbcc7af5ad?w=800", // 2
-    "https://images.unsplash.com/photo-1723360480597-d21deccaf3d0?w=800", // 3
+    game.imagem_url, 
+    "https://images.unsplash.com/photo-1708577269890-12a58e153589?w=800", 
+    "https://images.unsplash.com/photo-1705594975210-02cbcc7af5ad?w=800", 
+    "https://images.unsplash.com/photo-1723360480597-d21deccaf3d0?w=800", 
   ];
 
   const renderActiveMedia = () => {
     if (activeMedia === 0) {
       return (
-        // Padrão Home Page: Busca no assets-map pelo NOME
         <ImageWithFallback
+          src={game.imagem_url || undefined}
           gameName={game.nome}
           alt={`${game.nome} - Capa`}
           className="w-full h-64 sm:h-96 object-cover transition-all duration-300"
@@ -356,6 +389,7 @@ export function GameDetailsPageNew({
                 >
                   {idx === 0 ? (
                     <ImageWithFallback
+                      src={game.imagem_url || undefined}
                       gameName={game.nome}
                       alt="Miniatura Capa"
                       className="w-full h-20 sm:h-24 object-cover"
@@ -377,12 +411,19 @@ export function GameDetailsPageNew({
             <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-main-text mb-2 leading-tight">
               {game.nome}
             </h1>
-            <p className="text-secondary-text mb-6 text-lg">
-              <span className="font-semibold text-accent-purple">
-                {game.empresa}
-              </span>{" "}
-              • {game.categoria}
-            </p>
+            
+            {/* SUBTÍTULO DA EMPRESA */}
+            <div className="mb-6">
+              <p className="text-xl text-secondary-text">
+                <span className="font-bold text-accent-purple tracking-wide">
+                  {game.empresa}
+                </span>
+                <span className="mx-2 opacity-50">•</span>
+                <span className="text-base font-medium text-secondary-text/80">
+                  {game.categoria}
+                </span>
+              </p>
+            </div>
 
             <div className="flex items-center mb-8 bg-secondary-bg/50 p-3 rounded-lg w-fit border border-border/50">
               <div className="flex text-yellow-400">

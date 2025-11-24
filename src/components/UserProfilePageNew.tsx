@@ -5,7 +5,7 @@ import { Badge } from './ui/badge';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { PageType } from '../App';
-import { User, ShoppingBag, Star, Menu, X, ArrowLeft, Loader2, Heart, Trash2, Calendar } from 'lucide-react';
+import { User, ShoppingBag, Star, Menu, X, ArrowLeft, Loader2, Heart, Trash2 } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import { useAPI } from './useAPI';
 import { Avatar } from './Avatar';
@@ -98,15 +98,6 @@ export function UserProfilePageNew({ onNavigate }: UserProfilePageNewProps) {
       showToast({ type: 'error', title: 'Erro', message: 'Erro ao remover item.' });
     }
   }
-
-  // Função simulada de remover avaliação (apenas visual, pois backend não tem rota)
-  const handleRemoveReview = (reviewId: number) => {
-     showToast({
-        type: 'info',
-        title: 'Ação Indisponível',
-        message: 'A exclusão de avaliações não está habilitada no servidor.'
-     });
-  };
 
   const loadReviews = async () => {
     setIsLoading(true);
@@ -306,7 +297,7 @@ export function UserProfilePageNew({ onNavigate }: UserProfilePageNewProps) {
                     </div>
                   </div>
                   
-                  {/* BOTÃO EXCLUIR NA MESMA LINHA DO PREÇO */}
+                  {/* BOTÃO EXCLUIR (LIXEIRA) - PRESENTE NA LISTA DE DESEJOS */}
                   <Button 
                       variant="ghost" 
                       size="icon"
@@ -353,13 +344,12 @@ export function UserProfilePageNew({ onNavigate }: UserProfilePageNewProps) {
           </CardContent>
         </Card>
       ) : (
-        // MUDANÇA: Layout em Grid igual ao Wishlist
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {reviews.map((review, idx) => (
             <Card key={idx} className="bg-secondary-bg border-border hover:border-accent-purple transition-all duration-300 hover:-translate-y-1 flex flex-col">
               <CardContent className="p-4 flex flex-col flex-grow">
                 
-                {/* IMAGEM DO JOGO (Grande, igual Wishlist) */}
+                {/* IMAGEM DO JOGO */}
                 <div className="w-full h-32 overflow-hidden rounded-lg mb-4 relative group bg-black/20 cursor-pointer" onClick={() => onNavigate('details', { gameId: review.fkJogo })}>
                     <ImageWithFallback 
                     gameName={review.gameName}
@@ -372,7 +362,7 @@ export function UserProfilePageNew({ onNavigate }: UserProfilePageNewProps) {
                     {review.gameName}
                 </h3>
 
-                {/* LINHA DE AVALIAÇÃO E BOTÃO EXCLUIR (Alinhados) */}
+                {/* LINHA DE AVALIAÇÃO - SEM BOTÃO DE EXCLUIR AQUI */}
                 <div className="flex justify-between items-center mb-3">
                     <div className="flex flex-col">
                         <div className="flex text-yellow-400">
@@ -391,17 +381,6 @@ export function UserProfilePageNew({ onNavigate }: UserProfilePageNewProps) {
                             {new Date(review.data || Date.now()).toLocaleDateString()}
                         </span>
                     </div>
-
-                    {/* BOTÃO EXCLUIR NA MESMA LINHA DAS ESTRELAS */}
-                    <Button 
-                        variant="ghost" 
-                        size="icon"
-                        className="text-secondary-text hover:text-red-500 hover:bg-red-500/10 transition-colors h-8 w-8"
-                        onClick={() => handleRemoveReview(review.id)}
-                        title="Excluir avaliação"
-                    >
-                        <Trash2 className="w-5 h-5" />
-                    </Button>
                 </div>
 
                 <div className="bg-main-bg/50 p-3 rounded-lg border border-border/30 mt-auto">
