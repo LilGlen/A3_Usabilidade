@@ -41,9 +41,10 @@ export default function App() {
   };
 
   return (
-    <AuthProvider>
-      <CartProvider>
-        <ToastProvider>
+    <ToastProvider>
+      <AuthProvider>
+        <CartProvider>
+
           <AppContent
             currentPage={currentPage}
             pageData={pageData}
@@ -51,11 +52,13 @@ export default function App() {
             searchTerm={searchTerm}
             onSearchChange={handleSearchChange}
           />
-        </ToastProvider>
-      </CartProvider>
-    </AuthProvider>
+
+        </CartProvider>
+      </AuthProvider>
+    </ToastProvider>
   );
 }
+
 
 function AppContent({
   currentPage,

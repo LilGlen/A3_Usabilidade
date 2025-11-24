@@ -4,7 +4,20 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { useAuth } from './AuthContext';
-import { toast } from 'sonner@2.0.3';
+import { useToast } from './ToastProvider';
+
+const isValidDateString = (dateString: string): boolean => {
+  if (!/^\d{2}\/\d{2}\/\d{4}$/.test(dateString)) return false;
+
+  const [day, month, year] = dateString.split('/').map(Number);
+  const date = new Date(year, month - 1, day);
+
+  return (
+    date.getFullYear() === year &&
+    date.getMonth() === month - 1 &&
+    date.getDate() === day
+  );
+};
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -16,20 +29,22 @@ interface AuthModalProps {
 export function AuthModal({ isOpen, onClose, initialMode = 'login', onLogin }: AuthModalProps) {
   const [mode, setMode] = useState<'login' | 'register'>(initialMode);
   const [isLoading, setIsLoading] = useState(false);
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    dataNascimento: ''
   });
-  
-  const { login, register } = useAuth();
 
-  // Sincroniza o mode interno com o initialMode quando o modal abre
+  const { login, register } = useAuth();
+  const { showToast } = useToast();
+
   useEffect(() => {
     if (isOpen) {
       setMode(initialMode);
-      setFormData({ name: '', email: '', password: '', confirmPassword: '' });
+      setFormData({ name: '', email: '', password: '', confirmPassword: '', dataNascimento: '' });
     }
   }, [isOpen, initialMode]);
 
@@ -43,67 +58,89 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login', onLogin }: A
     e.preventDefault();
     setIsLoading(true);
 
+    let success = false;
+
     try {
       if (mode === 'login') {
-        const success = await login(formData.email, formData.password);
-        if (success) {
-          toast.success('Login realizado com sucesso!');
-          onClose();
-          if (onLogin) {
-            onLogin(); // Trigger navigation to profile page
-          }
-        } else {
-          toast.error('Email ou senha incorretos. Execute o wizard de setup se for a primeira vez!');
+        success = await login(formData.email, formData.password);
+
+        if (!success) {
+          // O erro já foi exibido pelo AuthContext.
         }
+
       } else {
-        // Register mode
+        // VALIDAR SENHAS
         if (formData.password !== formData.confirmPassword) {
-          toast.error('As senhas não coincidem');
-          setIsLoading(false);
+          showToast({
+            type: 'error',
+            title: 'Senhas não coincidem',
+            message: 'Por favor, verifique a confirmação de senha.'
+          });
           return;
         }
-        
+
         if (formData.password.length < 6) {
-          toast.error('A senha deve ter no mínimo 6 caracteres');
-          setIsLoading(false);
+          showToast({
+            type: 'error',
+            title: 'Senha muito curta',
+            message: 'A senha deve ter pelo menos 6 caracteres.'
+          });
           return;
         }
-        
-        const success = await register(formData.name, formData.email, formData.password);
-        if (success) {
-          toast.success('Conta criada com sucesso! Você foi automaticamente logado.');
-          onClose();
-          if (onLogin) {
-            onLogin(); // Trigger navigation to profile page
-          }
-        } else {
-          toast.error('Email já cadastrado ou erro no servidor');
+
+        if (!isValidDateString(formData.dataNascimento)) {
+          showToast({
+            type: 'error',
+            title: 'Data inválida',
+            message: 'Use o formato DD/MM/AAAA.'
+          });
+          return;
         }
+
+        // REALIZA CADASTRO
+        success = await register(
+          formData.name,
+          formData.email,
+          formData.password,
+          formData.dataNascimento
+        );
+
+        // O próprio AuthContext já exibe o toast certo.
       }
+
+      // SE DEU CERTO → Fecha modal e executa callback
+      if (success) {
+        onClose();
+        if (onLogin) onLogin();
+      }
+
     } catch (error) {
-      toast.error('Erro interno do servidor');
+      console.error("Erro no handleSubmit:", error);
+      showToast({
+        type: 'error',
+        title: 'Erro interno',
+        message: 'Ocorreu um erro inesperado ao processar sua requisição.'
+      });
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleOverlayClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
-      onClose();
-    }
+    if (e.target === e.currentTarget) onClose();
   };
 
   return (
-    <div 
+    <div
       className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
       onClick={handleOverlayClick}
     >
       <div className="bg-secondary-bg rounded-xl shadow-2xl p-6 w-full max-w-md relative">
-        {/* Close Button */}
+
+        {/* Botão Fechar */}
         <button
           onClick={onClose}
           className="absolute top-4 right-4 p-2 text-secondary-text hover:text-main-text transition-colors duration-200 hover:bg-main-bg rounded-lg"
-          aria-label="Fechar"
         >
           <X size={20} />
         </button>
@@ -116,104 +153,95 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login', onLogin }: A
           <p className="text-secondary-text">
             {mode === 'login' ? 'Bem-vindo de volta!' : 'Junte-se à SYNTHX'}
           </p>
-          {mode === 'login' && (
-            <div className="mt-3 p-3 bg-main-bg rounded-lg border border-border">
-              <p className="text-xs text-secondary-text mb-2">Credenciais após setup inicial:</p>
-              <div className="space-y-1 text-xs text-secondary-text">
-                <p><strong>Admin:</strong> admin@synthx.com</p>
-                <p><strong>Senha:</strong> admin123</p>
-                <p className="text-accent-purple mt-2">Execute o wizard de setup na primeira vez!</p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    localStorage.removeItem('synthx_setup_complete');
-                    window.location.reload();
-                  }}
-                  className="text-xs text-accent-purple hover:underline mt-2 block"
-                >
-                  Não funcionou? Voltar ao wizard de setup
-                </button>
-              </div>
-            </div>
-          )}
         </div>
 
-        {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
+
+          {/* NOME */}
           {mode === 'register' && (
             <div>
-              <Label htmlFor="name" className="block text-secondary-text mb-2">
-                Nome Completo
-              </Label>
+              <Label className="block text-secondary-text mb-2">Nome Completo</Label>
               <Input
                 type="text"
-                id="name"
                 value={formData.name}
                 onChange={(e) => handleInputChange('name', e.target.value)}
-                className="w-full bg-main-bg border border-border text-main-text rounded-lg py-2.5 px-4 focus:outline-none focus:ring-2 focus:ring-accent-purple transition"
                 placeholder="Seu nome completo"
                 required
                 disabled={isLoading}
+                className="w-full bg-main-bg border border-border text-main-text rounded-lg py-2.5 px-4"
               />
             </div>
           )}
 
+          {/* DATA DE NASCIMENTO */}
+          {mode === 'register' && (
+            <div>
+              <Label className="block text-secondary-text mb-2">Data de Nascimento (DD/MM/AAAA)</Label>
+              <Input
+                type="text"
+                value={formData.dataNascimento}
+                onChange={(e) => handleInputChange('dataNascimento', e.target.value)}
+                placeholder="01/01/2000"
+                required
+                disabled={isLoading}
+                pattern="\d{2}/\d{2}/\d{4}"
+                title="Use o formato DD/MM/AAAA"
+                className="w-full bg-main-bg border border-border text-main-text rounded-lg py-2.5 px-4"
+              />
+            </div>
+          )}
+
+          {/* EMAIL */}
           <div>
-            <Label htmlFor="email" className="block text-secondary-text mb-2">
-              Email
-            </Label>
+            <Label className="block text-secondary-text mb-2">Email</Label>
             <Input
               type="email"
-              id="email"
               value={formData.email}
               onChange={(e) => handleInputChange('email', e.target.value)}
-              className="w-full bg-main-bg border border-border text-main-text rounded-lg py-2.5 px-4 focus:outline-none focus:ring-2 focus:ring-accent-purple transition"
               placeholder="seu@email.com"
               required
               disabled={isLoading}
+              className="w-full bg-main-bg border border-border text-main-text rounded-lg py-2.5 px-4"
             />
           </div>
 
+          {/* SENHA */}
           <div>
-            <Label htmlFor="password" className="block text-secondary-text mb-2">
-              Senha
-            </Label>
+            <Label className="block text-secondary-text mb-2">Senha</Label>
             <Input
               type="password"
-              id="password"
               value={formData.password}
               onChange={(e) => handleInputChange('password', e.target.value)}
-              className="w-full bg-main-bg border border-border text-main-text rounded-lg py-2.5 px-4 focus:outline-none focus:ring-2 focus:ring-accent-purple transition"
               placeholder="Sua senha"
               required
               disabled={isLoading}
               minLength={6}
+              className="w-full bg-main-bg border border-border text-main-text rounded-lg py-2.5 px-4"
             />
           </div>
 
+          {/* CONFIRMAR SENHA */}
           {mode === 'register' && (
             <div>
-              <Label htmlFor="confirmPassword" className="block text-secondary-text mb-2">
-                Confirmar Senha
-              </Label>
+              <Label className="block text-secondary-text mb-2">Confirmar Senha</Label>
               <Input
                 type="password"
-                id="confirmPassword"
                 value={formData.confirmPassword}
                 onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
-                className="w-full bg-main-bg border border-border text-main-text rounded-lg py-2.5 px-4 focus:outline-none focus:ring-2 focus:ring-accent-purple transition"
                 placeholder="Confirme sua senha"
                 required
                 disabled={isLoading}
                 minLength={6}
+                className="w-full bg-main-bg border border-border text-main-text rounded-lg py-2.5 px-4"
               />
             </div>
           )}
 
-          <Button 
-            type="submit" 
+          {/* BOTÃO */}
+          <Button
+            type="submit"
             disabled={isLoading}
-            className="w-full bg-accent-purple hover:bg-accent-hover text-white font-bold py-3 px-6 rounded-lg transition duration-300 transform hover:scale-105 mt-6 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+            className="w-full bg-accent-purple hover:bg-accent-hover text-white font-bold py-3 px-6 rounded-lg mt-6 transition"
           >
             {isLoading ? (
               <>
@@ -224,20 +252,9 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login', onLogin }: A
               mode === 'login' ? 'Entrar' : 'Criar Conta'
             )}
           </Button>
-
-          {mode === 'login' && (
-            <div className="text-center mt-4">
-              <button 
-                type="button"
-                className="text-accent-purple hover:underline text-sm"
-              >
-                Esqueceu sua senha?
-              </button>
-            </div>
-          )}
         </form>
 
-        {/* Toggle Mode */}
+        {/* Alternar modo */}
         <div className="text-center mt-6 pt-4 border-t border-border">
           <p className="text-secondary-text text-sm">
             {mode === 'login' ? 'Não tem uma conta?' : 'Já tem uma conta?'}

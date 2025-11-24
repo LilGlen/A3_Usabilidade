@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode, } from "react";
 import { jwtDecode } from "jwt-decode";
+import { useToast } from "./ToastProvider";
 import { API_URL, LOGIN_ENDPOINT, REGISTER_ENDPOINT, } from "../types/api-endpoints";
 
 interface User {
@@ -19,7 +20,7 @@ interface AuthState {
 
 interface AuthContextType extends AuthState {
   login: (email: string, password: string) => Promise<boolean>;
-  register: (name: string, email: string, password: string) => Promise<boolean>;
+  register: (name: string, email: string, password: string, dataNascimento: string) => Promise<boolean>;
   logout: () => void;
   hasPermission: (permission: string) => boolean;
   isLoading: boolean;
@@ -61,6 +62,8 @@ const isTokenExpired = (token: string): boolean => {
 };
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const { showToast } = useToast();
+
   const [authState, setAuthState] = useState<AuthState>({
     user: null,
     token: null,
@@ -79,6 +82,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     localStorage.removeItem("synthx_token");
     localStorage.removeItem("synthx_user");
+
+    showToast({
+      type: "info",
+      title: "Sessão encerrada",
+      message: "Você saiu da sua conta.",
+    });
   };
 
   const login = async (email: string, password: string): Promise<boolean> => {
@@ -92,12 +101,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         body: JSON.stringify({ email, senha: password }),
       });
 
-      if (!response.ok) return false;
+      if (!response.ok){ 
+        // Pop-up para credenciais inválidas (401) ou usuário não encontrado (404)
+        const errorData = await response.json();
+        showToast({
+          type: "error",
+          title: "Erro ao entrar",
+          message: errorData.message || "Credenciais inválidas.",
+        });
+        return false;
+      }
 
       const data = await response.json();
       const token = data.token;
 
       const decoded: any = jwtDecode(token);
+
+      if (!decoded || !decoded.perfil) {
+        showToast({
+          type: "error",
+          title: "Erro interno",
+          message: "Token inválido recebido do servidor.",
+        });
+        return false;
+      }
 
       const role = mapProfileToRole(decoded.perfil);
 
@@ -119,9 +146,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.setItem("synthx_token", token);
       localStorage.setItem("synthx_user", JSON.stringify(user));
 
+      showToast({
+        type: "success",
+        title: "Bem-vindo",
+        message: `Seja bem-vindo, ${user.name}!`,
+      });
+
       return true;
     } catch (err) {
       console.error("LOGIN ERROR:", err);
+      showToast({
+        type: "error",
+        title: "Falha no servidor",
+        message: "Não foi possível conectar à API.",
+      });
       return false;
     } finally {
       setIsLoading(false);
@@ -131,7 +169,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const register = async (
     name: string,
     email: string,
-    password: string
+    password: string,
+    dataNascimento: string
   ): Promise<boolean> => {
     setIsLoading(true);
 
@@ -145,13 +184,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           nome: name,
           email,
           senha: password,
-          dataNascimento: "01/01/2000",
+          dataNascimento: dataNascimento,
         }),
       });
 
-      if (!response.ok) return false;
+      if (!response.ok){ 
+        // Pop-up para erro de cadastro (e-mail já em uso - 409, ou erro de validação - 400)
+        const errorData = await response.json();
+        showToast({
+          type: "error",
+          title: "Erro no cadastro",
+          message: errorData.message || "E-mail já está em uso.",
+        });
+        return false;
+      }
       return await login(email, password);
-    } catch {
+    } catch (err) {
+      // Pop-up para falhas de rede no cadastro
+      console.error("REGISTER ERROR:", err);
+      showToast({
+        type: "error",
+        title: "Erro no servidor",
+        message: "Não foi possível completar o cadastro.",
+      });
       return false;
     } finally {
       setIsLoading(false);
