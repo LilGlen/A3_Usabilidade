@@ -15,7 +15,7 @@ import {
   REPORT_SALES_ENDPOINT
 } from "../types/api-endpoints";
 
-// --- INTERFACES (Mantidas e Incrementadas) ---
+// --- INTERFACES ---
 
 export interface CarrinhoItem {
   id: number;
@@ -111,7 +111,7 @@ export function useAPI() {
           : `/${endpoint}`;
         const url = `${API_URL}${normalizedEndpoint}`;
 
-        console.log(`🔄 API Request: ${options.method || 'GET'} ${url}`);
+        // console.log(`🔄 API Request: ${options.method || 'GET'} ${url}`);
 
         const resp = await fetch(url, { ...options, headers });
 
@@ -157,7 +157,7 @@ export function useAPI() {
     [makeRequest]
   );
 
-  // --- JOGOS (ADMINISTRATIVO - Novas Funções) ---
+  // --- JOGOS (ADMINISTRATIVO) ---
   const getAllGames = useCallback(
     () => makeRequest<any>(GAME_ENDPOINT),
     [makeRequest]
@@ -178,7 +178,7 @@ export function useAPI() {
     [makeRequest]
   );
 
-  // --- EMPRESAS (ADMINISTRATIVO - Novas Funções) ---
+  // --- EMPRESAS ---
   const getCompanies = useCallback(
     () => makeRequest<any>(ENTERPRISE_BASE_ENDPOINT || "/empresas"),
     [makeRequest]
@@ -204,7 +204,7 @@ export function useAPI() {
     [makeRequest]
   );
 
-  // --- CATEGORIAS (ADMINISTRATIVO - Novas Funções) ---
+  // --- CATEGORIAS ---
   const getCategories = useCallback(
     () => makeRequest<any>(CATEGORIES_BASE_ENDPOINT || "/categorias"),
     [makeRequest]
@@ -226,8 +226,15 @@ export function useAPI() {
   );
 
   // --- CARRINHO ---
+  
   const getCart = useCallback(
     () => makeRequest<GetCartResponse>(CART_ACTIVE_ENDPOINT),
+    [makeRequest]
+  );
+
+  // A ROTA DE FUGA: Pega o histórico de carrinhos (que contém as chaves)
+  const getCartHistory = useCallback(
+    () => makeRequest<{ carrinhosComItens: any[] }>(CART_BASE_ENDPOINT),
     [makeRequest]
   );
 
@@ -248,7 +255,6 @@ export function useAPI() {
     [makeRequest]
   );
 
-  // Checkout (Faltava no seu código original, mas é usado no CheckoutPage)
   const checkout = useCallback(
     (paymentMethod: string) =>
       makeRequest<CheckoutResponse>("/vendas/checkout", {
@@ -265,13 +271,11 @@ export function useAPI() {
     [makeRequest]
   );
 
-  // Função getAllReviews para o AdminPage
   const getAllReviews = useCallback(
     () => makeRequest<any[]>(RATE_BASE_ENDPOINT),
     [makeRequest]
   );
 
-  // Função getUserReviews (Reimplementada corretamente)
   const getUserReviews = useCallback(async () => {
     try {
       const allReviews = await makeRequest<any[]>(RATE_BASE_ENDPOINT);
@@ -321,13 +325,12 @@ export function useAPI() {
     [makeRequest]
   );
 
-  // --- HISTÓRICO DE COMPRAS ---
+  // --- HISTÓRICO DE COMPRAS / VENDAS ---
   const getPurchaseHistory = useCallback(
     () => makeRequest<any[]>(ORDERS_ENDPOINT), 
     [makeRequest]
   );
   
-  // Função getAllPurchases/Sales para o AdminPage
   const getAllSales = useCallback(
     () => makeRequest<any[]>(ORDERS_ENDPOINT),
     [makeRequest]
@@ -339,13 +342,11 @@ export function useAPI() {
     [makeRequest]
   );
   
-  // Função para obter estatísticas gerais (pode ser mockada ou calculada no front se o back não tiver)
   const getStatistics = useCallback(async () => {
-      // Se o backend não tiver esse endpoint específico, o AdminPageComplete calcula no front
-      // Mas deixamos a chamada aqui caso exista ou seja criada
       return makeRequest<any>("/relatorios/estatisticas");
   }, [makeRequest]);
 
+  
   return useMemo(
     () => ({
       // Jogos
@@ -355,13 +356,13 @@ export function useAPI() {
       // Categorias
       getCategories, createCategory, updateCategory, deleteCategory,
       // Carrinho
-      getCart, addToCart, removeFromCart, checkout,
+      getCart, getCartHistory, addToCart, removeFromCart, checkout, // AQUI: getCartHistory está exportado
       // Avaliações
       getGameReviews, getUserReviews, getAllReviews, createReview,
       // Wishlist
       getWishlist, addToWishlist, removeFromWishlist,
       // Histórico
-      getPurchaseHistory, getAllSales, getAllPurchases: getAllSales, // Alias para compatibilidade
+      getPurchaseHistory, getAllSales, getAllPurchases: getAllSales,
       // Relatórios
       getBestSellers, getStatistics
     }),
@@ -369,7 +370,7 @@ export function useAPI() {
       getGames, getGame, getAllGames, createGame, updateGame, deleteGame,
       getCompanies, getCompany, createCompany, updateCompany, deleteCompany,
       getCategories, createCategory, updateCategory, deleteCategory,
-      getCart, addToCart, removeFromCart, checkout,
+      getCart, getCartHistory, addToCart, removeFromCart, checkout, // AQUI TAMBÉM
       getGameReviews, getUserReviews, getAllReviews, createReview,
       getWishlist, addToWishlist, removeFromWishlist,
       getPurchaseHistory, getAllSales, getBestSellers, getStatistics
