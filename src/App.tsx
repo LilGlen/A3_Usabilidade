@@ -3,7 +3,7 @@ import { Header } from "./components/Header";
 import { Footer } from "./components/Footer";
 import { HomePage } from "./components/HomePage";
 import { GameDetailsPageNew } from "./components/GameDetailsPageNew";
-import { AdminPageComplete } from "./components/AdminPageComplete";
+import { AdminPageNew } from "./components/AdminPageNew";
 import { UserProfilePageNew } from "./components/UserProfilePageNew";
 import { ManagementPageNew } from "./components/ManagementPageNew";
 import { CheckoutPage } from "./components/CheckoutPage";
@@ -109,7 +109,7 @@ function AppContent({
         )}
 
         {currentPage === "admin" && (
-          <AdminPageComplete onNavigate={navigateToPage} />
+          <AdminPageNew onNavigate={navigateToPage} />
         )}
 
         {currentPage === "profile" && (

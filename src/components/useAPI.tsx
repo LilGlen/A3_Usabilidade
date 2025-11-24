@@ -12,7 +12,7 @@ import {
   ORDERS_ENDPOINT,
   ENTERPRISE_BASE_ENDPOINT,
   CATEGORIES_BASE_ENDPOINT,
-  REPORT_SALES_ENDPOINT
+  REPORT_SALES_ENDPOINT,
 } from "../types/api-endpoints";
 
 // --- INTERFACES ---
@@ -131,8 +131,13 @@ export function useAPI() {
         }
 
         // Tratamento de sucesso para garantir compatibilidade com estruturas do backend
-        if (resp.ok && typeof data === 'object' && data !== null && !Array.isArray(data)) {
-           return { success: true, ...data } as T;
+        if (
+          resp.ok &&
+          typeof data === "object" &&
+          data !== null &&
+          !Array.isArray(data)
+        ) {
+          return { success: true, ...data } as T;
         }
 
         return data as T;
@@ -164,17 +169,26 @@ export function useAPI() {
   );
 
   const createGame = useCallback(
-    (data: any) => makeRequest<any>(GAME_ENDPOINT, { method: "POST", body: JSON.stringify(data) }),
+    (data: any) =>
+      makeRequest<any>(GAME_ENDPOINT, {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
     [makeRequest]
   );
 
   const updateGame = useCallback(
-    (id: number, data: any) => makeRequest<any>(`${GAME_ENDPOINT}/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+    (id: number, data: any) =>
+      makeRequest<any>(`${GAME_ENDPOINT}/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }),
     [makeRequest]
   );
 
   const deleteGame = useCallback(
-    (id: number | string) => makeRequest<any>(`${GAME_ENDPOINT}/${id}`, { method: "DELETE" }),
+    (id: number | string) =>
+      makeRequest<any>(`${GAME_ENDPOINT}/${id}`, { method: "DELETE" }),
     [makeRequest]
   );
 
@@ -183,24 +197,36 @@ export function useAPI() {
     () => makeRequest<any>(ENTERPRISE_BASE_ENDPOINT || "/empresas"),
     [makeRequest]
   );
-  
+
   const getCompany = useCallback(
-    (id: string | number) => makeRequest<any>(`${ENTERPRISE_BASE_ENDPOINT || "/empresas"}/${id}`),
+    (id: string | number) =>
+      makeRequest<any>(`${ENTERPRISE_BASE_ENDPOINT || "/empresas"}/${id}`),
     [makeRequest]
   );
 
   const createCompany = useCallback(
-    (data: any) => makeRequest<any>(ENTERPRISE_BASE_ENDPOINT || "/empresas", { method: "POST", body: JSON.stringify(data) }),
+    (data: any) =>
+      makeRequest<any>(ENTERPRISE_BASE_ENDPOINT || "/empresas", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
     [makeRequest]
   );
 
   const updateCompany = useCallback(
-    (id: number, data: any) => makeRequest<any>(`${ENTERPRISE_BASE_ENDPOINT || "/empresas"}/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+    (id: number, data: any) =>
+      makeRequest<any>(`${ENTERPRISE_BASE_ENDPOINT || "/empresas"}/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }),
     [makeRequest]
   );
 
   const deleteCompany = useCallback(
-    (id: number | string) => makeRequest<any>(`${ENTERPRISE_BASE_ENDPOINT || "/empresas"}/${id}`, { method: "DELETE" }),
+    (id: number | string) =>
+      makeRequest<any>(`${ENTERPRISE_BASE_ENDPOINT || "/empresas"}/${id}`, {
+        method: "DELETE",
+      }),
     [makeRequest]
   );
 
@@ -211,22 +237,33 @@ export function useAPI() {
   );
 
   const createCategory = useCallback(
-    (data: any) => makeRequest<any>(CATEGORIES_BASE_ENDPOINT || "/categorias", { method: "POST", body: JSON.stringify(data) }),
+    (data: any) =>
+      makeRequest<any>(CATEGORIES_BASE_ENDPOINT || "/categorias", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
     [makeRequest]
   );
 
   const updateCategory = useCallback(
-    (id: number, data: any) => makeRequest<any>(`${CATEGORIES_BASE_ENDPOINT || "/categorias"}/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+    (id: number, data: any) =>
+      makeRequest<any>(`${CATEGORIES_BASE_ENDPOINT || "/categorias"}/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }),
     [makeRequest]
   );
 
   const deleteCategory = useCallback(
-    (id: number | string) => makeRequest<any>(`${CATEGORIES_BASE_ENDPOINT || "/categorias"}/${id}`, { method: "DELETE" }),
+    (id: number | string) =>
+      makeRequest<any>(`${CATEGORIES_BASE_ENDPOINT || "/categorias"}/${id}`, {
+        method: "DELETE",
+      }),
     [makeRequest]
   );
 
   // --- CARRINHO ---
-  
+
   const getCart = useCallback(
     () => makeRequest<GetCartResponse>(CART_ACTIVE_ENDPOINT),
     [makeRequest]
@@ -280,10 +317,11 @@ export function useAPI() {
     try {
       const allReviews = await makeRequest<any[]>(RATE_BASE_ENDPOINT);
       if (!Array.isArray(allReviews)) return [];
-      
-      const userReviews = allReviews.filter(review => 
-        String(review.fk_usuario) === String(user?.id) || 
-        String(review.fkUsuario) === String(user?.id)
+
+      const userReviews = allReviews.filter(
+        (review) =>
+          String(review.fk_usuario) === String(user?.id) ||
+          String(review.fkUsuario) === String(user?.id)
       );
       return userReviews;
     } catch (error) {
@@ -327,53 +365,97 @@ export function useAPI() {
 
   // --- HISTÓRICO DE COMPRAS / VENDAS ---
   const getPurchaseHistory = useCallback(
-    () => makeRequest<any[]>(ORDERS_ENDPOINT), 
+    () => makeRequest<any[]>(ORDERS_ENDPOINT),
     [makeRequest]
   );
-  
+
   const getAllSales = useCallback(
     () => makeRequest<any[]>(ORDERS_ENDPOINT),
     [makeRequest]
   );
 
   // --- RELATÓRIOS ---
-  const getBestSellers = useCallback(
-    (top: number = 5) => makeRequest<any[]>(`${REPORT_SALES_ENDPOINT || "/relatorios/jogos-mais-vendidos"}?top=${top}`),
-    [makeRequest]
-  );
-  
-  const getStatistics = useCallback(async () => {
-      return makeRequest<any>("/relatorios/estatisticas");
-  }, [makeRequest]);
+  const getMostSoldGames = (top = 10) =>
+    makeRequest(`${REPORT_SALES_ENDPOINT}?top=${top}`);
 
-  
+  const getMostSoldGamesByCompany = (companyId: number, top = 5) =>
+    makeRequest(`${REPORT_SALES_ENDPOINT}?top=${top}&empresa=${companyId}`);
+
   return useMemo(
     () => ({
       // Jogos
-      getGames, getGame, getAllGames, createGame, updateGame, deleteGame,
+      getGames,
+      getGame,
+      getAllGames,
+      createGame,
+      updateGame,
+      deleteGame,
       // Empresas
-      getCompanies, getCompany, createCompany, updateCompany, deleteCompany,
+      getCompanies,
+      getCompany,
+      createCompany,
+      updateCompany,
+      deleteCompany,
       // Categorias
-      getCategories, createCategory, updateCategory, deleteCategory,
+      getCategories,
+      createCategory,
+      updateCategory,
+      deleteCategory,
       // Carrinho
-      getCart, getCartHistory, addToCart, removeFromCart, checkout, // AQUI: getCartHistory está exportado
+      getCart,
+      getCartHistory,
+      addToCart,
+      removeFromCart,
+      checkout, // AQUI: getCartHistory está exportado
       // Avaliações
-      getGameReviews, getUserReviews, getAllReviews, createReview,
+      getGameReviews,
+      getUserReviews,
+      getAllReviews,
+      createReview,
       // Wishlist
-      getWishlist, addToWishlist, removeFromWishlist,
+      getWishlist,
+      addToWishlist,
+      removeFromWishlist,
       // Histórico
-      getPurchaseHistory, getAllSales, getAllPurchases: getAllSales,
+      getPurchaseHistory,
+      getAllSales,
+      getAllPurchases: getAllSales,
       // Relatórios
-      getBestSellers, getStatistics
+      getMostSoldGames,
+      getMostSoldGamesByCompany,
     }),
     [
-      getGames, getGame, getAllGames, createGame, updateGame, deleteGame,
-      getCompanies, getCompany, createCompany, updateCompany, deleteCompany,
-      getCategories, createCategory, updateCategory, deleteCategory,
-      getCart, getCartHistory, addToCart, removeFromCart, checkout, // AQUI TAMBÉM
-      getGameReviews, getUserReviews, getAllReviews, createReview,
-      getWishlist, addToWishlist, removeFromWishlist,
-      getPurchaseHistory, getAllSales, getBestSellers, getStatistics
+      getGames,
+      getGame,
+      getAllGames,
+      createGame,
+      updateGame,
+      deleteGame,
+      getCompanies,
+      getCompany,
+      createCompany,
+      updateCompany,
+      deleteCompany,
+      getCategories,
+      createCategory,
+      updateCategory,
+      deleteCategory,
+      getCart,
+      getCartHistory,
+      addToCart,
+      removeFromCart,
+      checkout, // AQUI TAMBÉM
+      getGameReviews,
+      getUserReviews,
+      getAllReviews,
+      createReview,
+      getWishlist,
+      addToWishlist,
+      removeFromWishlist,
+      getPurchaseHistory,
+      getAllSales,
+      getMostSoldGames,
+      getMostSoldGamesByCompany,
     ]
   );
 }
