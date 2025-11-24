@@ -34,7 +34,6 @@ export function GameDetailsPageNew({
   const [isLoading, setIsLoading] = useState(true);
   const [userRating, setUserRating] = useState(0);
   const [userComment, setUserComment] = useState("");
-  const [hasSpoilers, setHasSpoilers] = useState(false);
   const [submittingReview, setSubmittingReview] = useState(false);
   const [activeMedia, setActiveMedia] = useState(0);
   const [isAddingToWishlist, setIsAddingToWishlist] = useState(false);
@@ -56,27 +55,51 @@ export function GameDetailsPageNew({
   const loadGameDetails = async () => {
     setIsLoading(true);
     try {
-      // 1. Busca o jogo e as reviews
-      const [gameResult, reviewsResponse] = await Promise.all([
+      // 1. Buscamos Jogo, Reviews, Empresas E AGORA Categorias
+      const [gameResult, reviewsResponse, companiesResult, categoriesResult] = await Promise.all([
         api.getGame(gameId || ""),
         api.getGameReviews(gameId || ""),
+        api.getCompanies(),
+        api.getCategories(), // Novo: Buscando categorias
       ]);
 
-      // 2. Busca o nome da empresa se tivermos o ID (fk_empresa)
+      // --- LÓGICA DE RECUPERAÇÃO DO NOME DA EMPRESA ---
       let empresaNome = "Desenvolvedora Desconhecida";
-      if (gameResult && gameResult.fk_empresa) {
-        try {
-          const companyResult = await api.getCompany(gameResult.fk_empresa);
-          if (companyResult && (companyResult.nome || companyResult.name)) {
-            empresaNome = companyResult.nome || companyResult.name;
-          }
-        } catch (e) {
-          console.warn("Não foi possível carregar o nome da empresa");
-        }
-      } else if (gameResult?.empresa) {
-         empresaNome = gameResult.empresa;
+      const companiesList = Array.isArray(companiesResult) 
+        ? companiesResult 
+        : (companiesResult?.companies || []);
+
+      if (gameResult) {
+         const empresaId = gameResult.fk_empresa || gameResult.fkEmpresa;
+         if (empresaId) {
+            const foundCompany = companiesList.find((c: any) => c.id === empresaId);
+            if (foundCompany) empresaNome = foundCompany.name || foundCompany.nome;
+         } else if (gameResult.empresa) {
+            empresaNome = gameResult.empresa;
+         }
       }
 
+      // --- LÓGICA DE RECUPERAÇÃO DO NOME DA CATEGORIA (INCREMENTADO) ---
+      let categoriaNome = "Geral";
+      const categoriesList = Array.isArray(categoriesResult)
+        ? categoriesResult
+        : (categoriesResult?.categories || []);
+
+      if (gameResult) {
+          const categoriaId = gameResult.fk_categoria || gameResult.fkCategoria;
+          if (categoriaId) {
+              // Procura na lista de categorias pelo ID
+              const foundCategory = categoriesList.find((c: any) => c.id === categoriaId);
+              if (foundCategory) {
+                  categoriaNome = foundCategory.name || foundCategory.nome;
+              }
+          } else if (gameResult.categoria) {
+              // Fallback se já vier preenchido
+              categoriaNome = gameResult.categoria;
+          }
+      }
+
+      // Processamento das avaliações
       const reviewsList = reviewsResponse?.avaliacoes || [];
       const freshRating = reviewsResponse?.media !== undefined ? reviewsResponse.media : (gameResult?.nota_media || 0);
 
@@ -87,9 +110,9 @@ export function GameDetailsPageNew({
           nome: gameResult.nome || gameResult.titulo || gameResult.name,
           descricao: gameResult.descricao || gameResult.description,
           preco: gameResult.preco || gameResult.price || 0,
-          nota_media: freshRating,
-          empresa: empresaNome, // Nome resolvido da empresa
-          categoria: gameResult.categoria || gameResult.category || "Geral",
+          nota_media: freshRating, 
+          empresa: empresaNome,    // Nome da empresa resolvido
+          categoria: categoriaNome, // Nome da categoria resolvido
           imagem_url: gameResult.imagem_url || undefined,
         };
         setGame(mappedGame);
@@ -103,7 +126,6 @@ export function GameDetailsPageNew({
           usuario: review.usuario?.nome || review.nome_usuario || "Usuário",
           nota: review.nota || review.rating || 0,
           comentario: review.comentario || review.comment || "",
-          hasSpoilers: review.spoilers || review.hasSpoilers || false,
           data: review.data_criacao || review.created_at || new Date().toISOString(),
         }));
         setReviews(mappedReviews);
@@ -212,7 +234,7 @@ export function GameDetailsPageNew({
     }
   };
 
-  const handleSubmitReview = async (e: React.FormEvent) => {
+    const handleSubmitReview = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isAuthenticated) {
       showToast({ 
@@ -239,38 +261,27 @@ export function GameDetailsPageNew({
         nota: userRating,
         comentario: userComment,
       });
+      console.log(result, result?.status)
 
-      // Verifica sucesso baseado nas respostas possíveis do seu backend
-      if (result?.review || result?.success || result?.message === "Avaliação criada com sucesso!") {
+      if (result.success) {
         showToast({ 
           type: "success", 
           title: "Sucesso!", 
           message: "Avaliação encaminhada com sucesso"
         });
-        
-        // Atualização Otimista: Adiciona a review na lista imediatamente
-        const newReview = {
-          id: Date.now(), // ID temporário
-          usuario: user?.name || "Você",
-          nota: userRating,
-          comentario: userComment,
-          hasSpoilers: hasSpoilers,
-          data: new Date().toISOString()
-        };
-        
-        setReviews(prev => [newReview, ...prev]);
         setUserRating(0);
         setUserComment("");
         setHasSpoilers(false);
-
-      } else if (result?.message === "Você já avaliou este jogo." || (result as any)?.error === "Você já avaliou este jogo.") {
-         showToast({ 
+        await loadGameDetails(); // Recarrega para atualizar a lista e média
+      } else if(result.message === "Você já avaliou este jogo."){
+          showToast({ 
           type: "info", 
           title: "Atenção", 
           message: "Item já avaliado"
         });
-      } else {
-        // Fallback genérico de erro
+
+      }
+      else {
         showToast({ 
           type: "error", 
           title: "Erro", 
@@ -279,7 +290,7 @@ export function GameDetailsPageNew({
       }
     } catch (err: any) {
       console.error("Error submitting review:", err);
-      if (err?.status === 400 && (err?.body?.message === "Você já avaliou este jogo." || err?.body?.error === "Você já avaliou este jogo.")) {
+      if (err?.status === 400 && err?.body?.message === "Você já avaliou este jogo.") {
          showToast({ 
           type: "info", 
           title: "Atenção", 
@@ -324,10 +335,10 @@ export function GameDetailsPageNew({
   }
 
   const mediaItems = [
-    game.imagem_url, 
-    "https://images.unsplash.com/photo-1708577269890-12a58e153589?w=800", 
-    "https://images.unsplash.com/photo-1705594975210-02cbcc7af5ad?w=800", 
-    "https://images.unsplash.com/photo-1723360480597-d21deccaf3d0?w=800", 
+    game.imagem_url, // 0: Capa
+    "https://images.unsplash.com/photo-1708577269890-12a58e153589?w=800", // 1
+    "https://images.unsplash.com/photo-1705594975210-02cbcc7af5ad?w=800", // 2
+    "https://images.unsplash.com/photo-1723360480597-d21deccaf3d0?w=800", // 3
   ];
 
   const renderActiveMedia = () => {
@@ -370,7 +381,7 @@ export function GameDetailsPageNew({
 
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 sm:gap-12">
           
-          {/* COLUNA ESQUERDA */}
+          {/* COLUNA ESQUERDA: IMAGENS */}
           <div className="lg:col-span-3">
             <div className="bg-secondary-bg rounded-xl overflow-hidden mb-4 border border-border">
               {renderActiveMedia()}
@@ -406,24 +417,19 @@ export function GameDetailsPageNew({
             </div>
           </div>
 
-          {/* COLUNA DIREITA */}
+          {/* COLUNA DIREITA: DETALHES */}
           <div className="lg:col-span-2">
             <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-main-text mb-2 leading-tight">
               {game.nome}
             </h1>
             
-            {/* SUBTÍTULO DA EMPRESA */}
-            <div className="mb-6">
-              <p className="text-xl text-secondary-text">
-                <span className="font-bold text-accent-purple tracking-wide">
-                  {game.empresa}
-                </span>
-                <span className="mx-2 opacity-50">•</span>
-                <span className="text-base font-medium text-secondary-text/80">
-                  {game.categoria}
-                </span>
-              </p>
-            </div>
+            {/* SUBTÍTULO DA EMPRESA E CATEGORIA */}
+            <p className="text-secondary-text mb-6 text-lg">
+              <span className="font-semibold text-accent-purple">
+                {game.empresa}
+              </span>{" "}
+              • {game.categoria}
+            </p>
 
             <div className="flex items-center mb-8 bg-secondary-bg/50 p-3 rounded-lg w-fit border border-border/50">
               <div className="flex text-yellow-400">
@@ -488,12 +494,6 @@ export function GameDetailsPageNew({
                   Descrição
                 </TabsTrigger>
                 <TabsTrigger 
-                  value="requisitos"
-                  className="rounded-none border-b-2 border-transparent data-[state=active]:border-accent-purple data-[state=active]:bg-transparent data-[state=active]:text-accent-purple pb-4 text-lg px-0 transition-colors hover:text-main-text"
-                >
-                  Requisitos
-                </TabsTrigger>
-                <TabsTrigger 
                   value="avaliacoes"
                   className="rounded-none border-b-2 border-transparent data-[state=active]:border-accent-purple data-[state=active]:bg-transparent data-[state=active]:text-accent-purple pb-4 text-lg px-0 transition-colors hover:text-main-text"
                 >
@@ -506,18 +506,6 @@ export function GameDetailsPageNew({
                   <p className="text-secondary-text leading-relaxed text-lg text-pretty">
                     {game.descricao || "Este jogo não possui descrição disponível."}
                   </p>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="requisitos" className="py-8">
-                <div className="bg-secondary-bg p-6 rounded-lg border border-border">
-                  <h3 className="text-main-text font-bold mb-4 text-lg">Requisitos Mínimos</h3>
-                  <ul className="space-y-2 text-secondary-text">
-                    <li><span className="font-semibold text-main-text">Sistema:</span> Windows 10 64-bit</li>
-                    <li><span className="font-semibold text-main-text">Processador:</span> Intel Core i5 ou equivalente</li>
-                    <li><span className="font-semibold text-main-text">Memória:</span> 8 GB RAM</li>
-                    <li><span className="font-semibold text-main-text">Gráficos:</span> NVIDIA GTX 1060 / AMD Radeon RX 580</li>
-                  </ul>
                 </div>
               </TabsContent>
 
@@ -560,17 +548,7 @@ export function GameDetailsPageNew({
                       />
                     </div>
 
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                      <label className="flex items-center gap-3 text-secondary-text cursor-pointer hover:text-main-text transition-colors select-none">
-                        <input
-                          type="checkbox"
-                          checked={hasSpoilers}
-                          onChange={(e) => setHasSpoilers(e.target.checked)}
-                          className="w-5 h-5 rounded border-border bg-main-bg text-accent-purple focus:ring-accent-purple"
-                        />
-                        <span>Contém spoilers</span>
-                      </label>
-
+                    <div className="flex flex-col sm:flex-row justify-end items-start sm:items-center gap-4">
                       <Button
                         type="submit"
                         className="bg-accent-purple hover:bg-accent-hover px-8 py-3 text-base font-semibold min-w-[140px] shadow-lg shadow-accent-purple/20"
@@ -624,14 +602,7 @@ export function GameDetailsPageNew({
                             </span>
                           </div>
                         </div>
-                        {review.hasSpoilers ? (
-                          <details className="group">
-                            <summary className="cursor-pointer text-yellow-500 font-medium">⚠️ Alerta de Spoiler (Clique para ver)</summary>
-                            <p className="mt-3 text-secondary-text">{review.comentario}</p>
-                          </details>
-                        ) : (
-                          <p className="text-secondary-text">{review.comentario}</p>
-                        )}
+                        <p className="text-secondary-text">{review.comentario}</p>
                       </div>
                     ))}
                   </div>
