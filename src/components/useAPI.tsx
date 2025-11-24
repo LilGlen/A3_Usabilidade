@@ -379,7 +379,7 @@ export function useAPI() {
     makeRequest(`${REPORT_SALES_ENDPOINT}?top=${top}`);
 
   const getMostSoldGamesByCompany = (companyId: number, top = 5) =>
-    makeRequest(`${REPORT_SALES_ENDPOINT}?top=${top}&empresa=${companyId}`);
+  makeRequest(`${REPORT_SALES_ENDPOINT}?top=${top}&empresa=${companyId}`);
 
   return useMemo(
     () => ({

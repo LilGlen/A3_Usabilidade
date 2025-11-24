@@ -2,190 +2,79 @@ import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { Input } from './ui/input';
-import { Label } from './ui/label';
-import { Textarea } from './ui/textarea';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
+import { Badge } from './ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 import { PageType } from '../App';
-import { Building2, Tag, Gamepad2, Plus, Edit, Trash2, Save, Loader2, ArrowLeft } from 'lucide-react';
-import { useAPI } from './useAPI';
 import { useAuth } from './AuthContext';
+import { useAPI } from './useAPI';
 import { toast } from 'sonner';
-
-// --- COMPONENTES DOS FORMULÁRIOS EXTRAÍDOS (FORA DO COMPONENTE PRINCIPAL) ---
-
-interface FormProps {
-  formData: any;
-  setFormData: (data: any) => void;
-  handleSubmit: (e: React.FormEvent) => void;
-  isLoading: boolean;
-  closeDialog: () => void;
-  companies?: any[]; // Apenas para GameForm
-  categories?: any[]; // Apenas para GameForm
-}
-
-const CompanyForm = ({ formData, setFormData, handleSubmit, isLoading, closeDialog }: FormProps) => (
-  <form onSubmit={handleSubmit} className="space-y-4">
-    <div>
-      <Label htmlFor="company-name" className="text-secondary-text">Nome da Empresa</Label>
-      <Input
-        id="company-name"
-        value={formData.name || formData.nome || ''}
-        onChange={(e) => setFormData({ ...formData, name: e.target.value, nome: e.target.value })}
-        className="bg-main-bg border-border text-main-text"
-        placeholder="Ex: Nintendo"
-        required
-        autoFocus // Ajuda a focar ao abrir
-      />
-    </div>
-    <div className="flex justify-end space-x-2">
-      <Button type="button" variant="outline" onClick={closeDialog}>Cancelar</Button>
-      <Button type="submit" className="bg-accent-purple hover:bg-accent-hover" disabled={isLoading}>
-        {isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-        Salvar
-      </Button>
-    </div>
-  </form>
-);
-
-const GameForm = ({ formData, setFormData, handleSubmit, isLoading, closeDialog, companies = [], categories = [] }: FormProps) => (
-  <form onSubmit={handleSubmit} className="space-y-4">
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <div>
-        <Label htmlFor="game-name" className="text-secondary-text">Nome do Jogo</Label>
-        <Input
-          id="game-name"
-          value={formData.name || formData.nome || ''}
-          onChange={(e) => setFormData({ ...formData, name: e.target.value, nome: e.target.value })}
-          className="bg-main-bg border-border text-main-text"
-          required
-          autoFocus
-        />
-      </div>
-      <div>
-        <Label htmlFor="game-price" className="text-secondary-text">Preço (R$)</Label>
-        <Input
-          id="game-price"
-          type="number"
-          step="0.01"
-          value={formData.price || formData.preco || ''}
-          onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value), preco: parseFloat(e.target.value) })}
-          className="bg-main-bg border-border text-main-text"
-          required
-        />
-      </div>
-      <div>
-        <Label htmlFor="game-year" className="text-secondary-text">Ano</Label>
-        <Input
-          id="game-year"
-          type="number"
-          value={formData.year || formData.ano || ''}
-          onChange={(e) => setFormData({ ...formData, year: parseInt(e.target.value), ano: parseInt(e.target.value) })}
-          className="bg-main-bg border-border text-main-text"
-          required
-        />
-      </div>
-    </div>
-    
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      {/* SELECT DE EMPRESAS */}
-      <div>
-        <Label htmlFor="game-company" className="text-secondary-text">Empresa</Label>
-        <Select
-          value={String(formData.fkEmpresa || formData.fk_empresa || '')}
-          onValueChange={(value) => setFormData({ ...formData, fkEmpresa: value, fk_empresa: value })}
-        >
-          <SelectTrigger className="bg-main-bg border-border text-main-text">
-            <SelectValue placeholder="Selecione a empresa" />
-          </SelectTrigger>
-          <SelectContent className="bg-secondary-bg border-border">
-            {companies.map((company) => (
-              <SelectItem key={company.id} value={String(company.id)} className="text-main-text">
-                {company.name || company.nome}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* SELECT DE CATEGORIAS */}
-      <div>
-        <Label htmlFor="game-category" className="text-secondary-text">Categoria</Label>
-        <Select
-          value={String(formData.fkCategoria || formData.fk_categoria || '')}
-          onValueChange={(value) => setFormData({ ...formData, fkCategoria: value, fk_categoria: value })}
-        >
-          <SelectTrigger className="bg-main-bg border-border text-main-text">
-            <SelectValue placeholder="Selecione a categoria" />
-          </SelectTrigger>
-          <SelectContent className="bg-secondary-bg border-border">
-            {categories.map((category) => (
-              <SelectItem key={category.id} value={String(category.id)} className="text-main-text">
-                {category.name || category.nome}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-    </div>
-
-    <div>
-      <Label htmlFor="game-description" className="text-secondary-text">Descrição</Label>
-      <Textarea
-        id="game-description"
-        value={formData.description || formData.descricao || ''}
-        onChange={(e) => setFormData({ ...formData, description: e.target.value, descricao: e.target.value })}
-        className="bg-main-bg border-border text-main-text"
-        rows={4}
-      />
-    </div>
-
-    <div className="flex justify-end space-x-2">
-      <Button type="button" variant="outline" onClick={closeDialog}>Cancelar</Button>
-      <Button type="submit" className="bg-accent-purple hover:bg-accent-hover" disabled={isLoading}>
-        {isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-        Salvar Jogo
-      </Button>
-    </div>
-  </form>
-);
-
-// --- COMPONENTE PRINCIPAL ---
+import { 
+  DollarSign,
+  Trophy,
+  Building2,
+  FileText,
+  Loader2,
+  Gamepad2,
+  LayoutList,
+  TrendingUp,
+  Filter,
+  Search
+} from 'lucide-react';
 
 interface ManagementPageProps {
   onNavigate: (page: PageType) => void;
 }
 
-export function ManagementPageNew({ onNavigate }: ManagementPageProps) {
-  const [activeTab, setActiveTab] = useState('companies');
-  const [isLoading, setIsLoading] = useState(false);
-  const [companies, setCompanies] = useState<any[]>([]);
-  const [categories, setCategories] = useState<any[]>([]);
-  const [games, setGames] = useState<any[]>([]);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingItem, setEditingItem] = useState<any>(null);
-  const [formData, setFormData] = useState<any>({});
-   
-  const api = useAPI();
-  const { hasPermission } = useAuth();
+// Interfaces baseadas no retorno esperado
+interface RelatorioItem {
+  nome_jogo: string;
+  nome_empresa: string;
+  total_vendido: number;
+}
 
-  if (!hasPermission('manage_companies')) {
+interface Empresa {
+  id: number;
+  nome: string;
+}
+
+export function ManagementPageNew({ onNavigate }: ManagementPageProps) {
+  const { hasPermission } = useAuth();
+  const api = useAPI();
+  
+  const [activeTab, setActiveTab] = useState('reports');
+  const [isLoading, setIsLoading] = useState(false);
+  const [isCompanyLoading, setIsCompanyLoading] = useState(false);
+
+  // Estados dos Relatórios
+  const [topGamesGlobal, setTopGamesGlobal] = useState<RelatorioItem[]>([]);
+  const [topGamesByCompany, setTopGamesByCompany] = useState<RelatorioItem[]>([]);
+  
+  // Controle do filtro de empresa
+  const [companies, setCompanies] = useState<Empresa[]>([]);
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string>("");
+  const [selectedCompanyName, setSelectedCompanyName] = useState<string>("");
+
+  // Totais Cards
+  const [stats, setStats] = useState({
+    totalRevenue: 0,
+    totalSales: 0
+  });
+
+  // Verificação de permissão
+  if (!hasPermission('view_reports')) {
     return (
-      <div className="min-h-screen bg-main-bg flex items-center justify-center">
-        <Card className="w-96 bg-secondary-bg border-border">
-          <CardHeader className="text-center">
-            <CardTitle className="text-main-text">Acesso Negado</CardTitle>
-            <CardDescription className="text-secondary-text">
-              Você não tem permissão para acessar esta página.
+      <div className="min-h-screen bg-[#121212] flex items-center justify-center p-6">
+        <Card className="max-w-md bg-[#1E1E1E] border-gray-800">
+          <CardHeader>
+            <CardTitle className="text-red-500">Acesso Negado</CardTitle>
+            <CardDescription className="text-gray-400">
+              Você não tem permissão para acessar a gestão.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Button 
-              onClick={() => onNavigate('home')} 
-              className="w-full bg-accent-purple hover:bg-accent-hover"
-            >
-              Voltar ao Início
+            <Button onClick={() => onNavigate('home')} className="w-full">
+              Voltar para Home
             </Button>
           </CardContent>
         </Card>
@@ -193,256 +82,392 @@ export function ManagementPageNew({ onNavigate }: ManagementPageProps) {
     );
   }
 
+  // Carga inicial (Global + Lista de Empresas)
   useEffect(() => {
-    loadData();
+    if (activeTab === 'reports') {
+      loadInitialData();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
-  const loadData = async () => {
+  const loadInitialData = async () => {
     setIsLoading(true);
     try {
-      if (activeTab === 'companies' || activeTab === 'games') {
-        const result = await api.getCompanies();
-        const list = Array.isArray(result) ? result : (result?.companies || []);
-        const uniqueCompanies = Array.from(new Map(list.map((c: any) => [c.id, c])).values());
-        setCompanies(uniqueCompanies);
-      } 
+      // 1. Relatório Global (Request 1 do Postman: ?top=10)
+      const globalData = await api.getMostSoldGames(10);
+      setTopGamesGlobal(normalizeData(globalData));
+
+      // 2. Buscar lista de empresas
+      const companiesRes = await api.getCompanies();
       
-      if (activeTab === 'categories' || activeTab === 'games') {
-        const result = await api.getCategories();
-        const list = Array.isArray(result) ? result : (result?.categories || []);
-        const uniqueCategories = Array.from(new Map(list.map((c: any) => [c.id, c])).values());
-        setCategories(uniqueCategories);
-      } 
+      const companiesList: Empresa[] = Array.isArray(companiesRes) 
+        ? companiesRes 
+        : (companiesRes?.companies || companiesRes?.empresas || []);
       
-      if (activeTab === 'games') {
-        const result = await api.getAllGames();
-        const list = Array.isArray(result) ? result : (result?.games || []);
-        const uniqueGames = Array.from(new Map(list.map((g: any) => [g.id, g])).values());
-        setGames(uniqueGames);
+      setCompanies(companiesList);
+
+      // Seleciona a primeira empresa por padrão se houver empresas carregadas
+      if (companiesList.length > 0) {
+        const firstCompanyId = companiesList[0].id.toString();
+        const firstCompanyName = companiesList[0].nome;
+        setSelectedCompanyId(firstCompanyId);
+        setSelectedCompanyName(firstCompanyName);
       }
+
+      // 3. KPI de totais
+      const purchasesRes = await api.getPurchaseHistory();
+      const purchasesList = Array.isArray(purchasesRes) ? purchasesRes : ((purchasesRes as any)?.vendas || []);
+      const totalRev = purchasesList.reduce((acc: number, p: any) => acc + Number(p.valor_total || p.total || 0), 0);
+      setStats({
+        totalRevenue: totalRev,
+        totalSales: purchasesList.length
+      });
+
     } catch (error) {
-      console.error('Error loading data:', error);
-      toast.error('Erro ao carregar dados');
+      console.error("Erro ao carregar dados iniciais", error);
+      toast.error("Erro ao carregar relatórios.");
     } finally {
       setIsLoading(false);
     }
   };
 
-  const openDialog = (item: any = null) => {
-    setEditingItem(item);
-    setFormData(item ? { ...item } : {});
-    setDialogOpen(true);
-  };
-
-  const closeDialog = () => {
-    setDialogOpen(false);
-    setEditingItem(null);
-    setFormData({});
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-
+  const loadCompanyReport = async (empresaId: number, empresaNome: string = "") => {
+    if (!empresaId) {
+      toast.error("Selecione uma empresa primeiro.");
+      return;
+    }
+    
+    setIsCompanyLoading(true);
+    setTopGamesByCompany([]);
+    
     try {
-      let result;
+      const companyData = await api.getMostSoldGamesByCompany(empresaId!, 5);
+      const normalizedData = normalizeData(companyData);
+      setTopGamesByCompany(normalizedData);
       
-      if (activeTab === 'companies') {
-        if (editingItem) {
-          result = await api.updateCompany(editingItem.id, formData);
-        } else {
-          result = await api.createCompany(formData);
-        }
-      } else if (activeTab === 'games') {
-        const payload = {
-            nome: formData.name || formData.nome,
-            descricao: formData.description || formData.descricao,
-            ano: Number(formData.year || formData.ano),
-            preco: Number(formData.price || formData.preco),
-            desconto: 0,
-            fkEmpresa: Number(formData.fkEmpresa),
-            fkCategoria: Number(formData.fkCategoria),
-        };
-
-        if (editingItem) {
-          result = await api.updateGame(editingItem.id, payload);
-        } else {
-          result = await api.createGame(payload);
-        }
+      if (empresaNome) {
+        setSelectedCompanyName(empresaNome);
       }
-
-      if (result && (result.success || result.id || result.changes)) {
-        toast.success(editingItem ? 'Atualizado com sucesso!' : 'Criado com sucesso!');
-        closeDialog();
-        await loadData();
+      
+      if (normalizedData.length === 0) {
+        toast.info(`Nenhuma venda encontrada para ${empresaNome || "a empresa selecionada"}`);
       } else {
-        toast.error('Erro ao salvar. Verifique os dados.');
+        toast.success(`Dados carregados para ${empresaNome || "a empresa"}`);
       }
     } catch (error) {
-      console.error('Error saving:', error);
-      toast.error('Erro ao salvar');
+      console.error("Erro ao carregar relatório por empresa", error);
+      toast.error("Erro ao carregar dados da empresa.");
+      setTopGamesByCompany([]);
     } finally {
-      setIsLoading(false);
+      setIsCompanyLoading(false);
     }
   };
 
-  const handleDelete = async (id: string | number) => {
-    if (!confirm('Tem certeza que deseja excluir?')) return;
-
-    setIsLoading(true);
-    try {
-      let result;
-      
-      if (activeTab === 'companies') {
-        result = await api.deleteCompany(id);
-      } else if (activeTab === 'games') {
-        result = await api.deleteGame(id);
-      }
-
-      if (result || result === null) {
-        toast.success('Excluído com sucesso!');
-        await loadData();
-      } else {
-        toast.error('Erro ao excluir');
-      }
-    } catch (error) {
-      console.error('Error deleting:', error);
-      toast.error('Erro ao excluir');
-    } finally {
-      setIsLoading(false);
+  // Handler para mudança de empresa no select
+  const handleCompanyChange = (companyId: string) => {
+    setSelectedCompanyId(companyId);
+    // Encontra o nome da empresa selecionada
+    const selectedCompany = companies.find(emp => emp.id.toString() === companyId);
+    if (selectedCompany) {
+      setSelectedCompanyName(selectedCompany.nome);
     }
+  };
+
+  // Handler para o botão de buscar
+  const handleSearchCompany = () => {
+    if (!selectedCompanyId) {
+      toast.error("Selecione uma empresa primeiro.");
+      return;
+    }
+    
+    const selectedCompany = companies.find(emp => emp.id.toString() === selectedCompanyId);
+    loadCompanyReport(Number(selectedCompanyId), selectedCompany?.nome);
+  };
+
+  // Helper para garantir formato consistente
+  const normalizeData = (data: any): RelatorioItem[] => {
+    if (!Array.isArray(data)) return [];
+    return data.map((item: any) => ({
+      nome_jogo: item.nome_jogo || item.nome || item.jogo || "Desconhecido",
+      nome_empresa: item.nome_empresa || item.empresa || item.desenvolvedora || "N/A",
+      total_vendido: Number(item.total_vendido || item.total || item.vendas || 0)
+    }));
+  };
+
+  const renderReports = () => {
+    if (isLoading && topGamesGlobal.length === 0) {
+      return (
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="w-10 h-10 text-purple-600 animate-spin" />
+          <span className="ml-3 text-gray-400">Carregando relatórios...</span>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        
+        {/* CARDS DE KPI */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+           <Card className="bg-[#1E1E1E] border-gray-800">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-gray-400 text-sm font-medium">Faturamento Total</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-green-500 flex items-center gap-2">
+                   <DollarSign className="w-6 h-6" />
+                   R$ {stats.totalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </div>
+              </CardContent>
+           </Card>
+
+           <Card className="bg-[#1E1E1E] border-gray-800">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-gray-400 text-sm font-medium">Volume de Vendas</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-purple-500 flex items-center gap-2">
+                   <TrendingUp className="w-6 h-6" />
+                   {stats.totalSales} pedidos
+                </div>
+              </CardContent>
+           </Card>
+        </div>
+
+        {/* RELATÓRIO 1: JOGOS MAIS VENDIDOS (GERAL) */}
+        <Card className="bg-[#1E1E1E] border-gray-800">
+          <CardHeader className="border-b border-gray-800 bg-gray-900/50">
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <CardTitle className="text-white flex items-center gap-2">
+                  <Trophy className="w-5 h-5 text-yellow-500" />
+                  Top 10 Jogos Mais Vendidos (Geral)
+                </CardTitle>
+                <CardDescription className="text-gray-400">
+                  Ranking global de vendas
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader className="bg-gray-900/50">
+                <TableRow className="border-gray-800 hover:bg-transparent">
+                  <TableHead className="w-[80px] text-center text-gray-400 font-bold">Pos.</TableHead>
+                  <TableHead className="text-gray-400 font-bold">Jogo</TableHead>
+                  <TableHead className="text-gray-400 font-bold">Empresa</TableHead>
+                  <TableHead className="text-right text-gray-400 font-bold pr-6">Qtd. Vendida</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {topGamesGlobal.length > 0 ? (
+                  topGamesGlobal.map((jogo, index) => (
+                    <TableRow key={index} className="border-gray-800 hover:bg-gray-800/50 transition-colors">
+                      <TableCell className="text-center font-bold text-gray-500">
+                         {index < 3 ? (
+                           <span className={`flex items-center justify-center w-8 h-8 rounded-full mx-auto ${
+                             index === 0 ? 'bg-yellow-500/20 text-yellow-500' :
+                             index === 1 ? 'bg-gray-400/20 text-gray-300' :
+                             'bg-orange-700/20 text-orange-500'
+                           }`}>
+                             #{index + 1}
+                           </span>
+                         ) : (
+                           `#${index + 1}`
+                         )}
+                      </TableCell>
+                      <TableCell className="font-medium text-white text-base">
+                        {jogo.nome_jogo}
+                      </TableCell>
+                      <TableCell className="text-gray-400">
+                        {jogo.nome_empresa}
+                      </TableCell>
+                      <TableCell className="text-right pr-6">
+                        <span className="font-mono text-lg text-purple-400 font-bold">
+                          {jogo.total_vendido.toLocaleString('pt-BR')}
+                        </span>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={4} className="h-24 text-center text-gray-500">
+                      Nenhum dado encontrado.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+
+        {/* RELATÓRIO 2: JOGOS MAIS VENDIDOS POR EMPRESA */}
+        <Card className="bg-[#1E1E1E] border-gray-800">
+          <CardHeader className="border-b border-gray-800 bg-gray-900/50">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <CardTitle className="text-white flex items-center gap-2">
+                  <Building2 className="w-5 h-5 text-blue-500" />
+                  Top 5 Jogos por Empresa
+                </CardTitle>
+                <CardDescription className="text-gray-400">
+                  {selectedCompanyName ? `Desempenho da empresa: ${selectedCompanyName}` : 'Selecione uma empresa para ver os dados'}
+                </CardDescription>
+              </div>
+              
+              {/* Filtro de Empresa com Botão de Busca */}
+              <div className="flex items-center gap-2">
+                <Filter className="w-4 h-4 text-gray-400" />
+                <Select value={selectedCompanyId} onValueChange={handleCompanyChange}>
+                  <SelectTrigger className="w-[200px] bg-gray-800 border-gray-700 text-white">
+                    <SelectValue placeholder="Selecione a empresa" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-gray-800 border-gray-700 text-white">
+                    {companies.map((emp) => (
+                      <SelectItem key={emp.id} value={emp.id.toString()}>
+                        {emp.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button 
+                  onClick={handleSearchCompany}
+                  disabled={!selectedCompanyId || isCompanyLoading}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  {isCompanyLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Search className="w-4 h-4" />
+                  )}
+                  <span className="ml-2">Buscar</span>
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="p-0 min-h-[150px]">
+            {/* Loading Overlay Específico */}
+            {isCompanyLoading ? (
+               <div className="h-48 flex flex-col items-center justify-center text-gray-400">
+                  <Loader2 className="w-8 h-8 text-blue-500 animate-spin mb-2" />
+                  <span className="text-sm">Carregando dados da empresa...</span>
+               </div>
+            ) : (
+            <Table>
+              <TableHeader className="bg-gray-900/50">
+                <TableRow className="border-gray-800 hover:bg-transparent">
+                  <TableHead className="w-[80px] text-center text-gray-400 font-bold">Rank</TableHead>
+                  <TableHead className="text-gray-400 font-bold">Jogo</TableHead>
+                  <TableHead className="text-right text-gray-400 font-bold pr-6">Vendas (Nesta Empresa)</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {topGamesByCompany.length > 0 ? (
+                  topGamesByCompany.map((jogo, index) => (
+                    <TableRow key={index} className="border-gray-800 hover:bg-gray-800/50 transition-colors">
+                       <TableCell className="text-center font-bold text-gray-500">
+                         #{index + 1}
+                       </TableCell>
+                      <TableCell className="font-medium text-white text-base">
+                        {jogo.nome_jogo}
+                      </TableCell>
+                      <TableCell className="text-right pr-6">
+                        <span className="font-mono text-lg text-blue-400 font-bold">
+                          {jogo.total_vendido.toLocaleString('pt-BR')}
+                        </span>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={3} className="h-24 text-center text-gray-500">
+                      {selectedCompanyId 
+                        ? "Nenhuma venda encontrada para esta empresa ou clique em 'Buscar' para carregar os dados." 
+                        : "Selecione uma empresa e clique em 'Buscar' para ver os dados."}
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+            )}
+          </CardContent>
+        </Card>
+
+      </div>
+    );
   };
 
   return (
-    <div className="container mx-auto px-6 py-12">
-      <div className="mb-8">
-        <Button 
-          onClick={() => onNavigate('admin')}
-          variant="outline"
-          className="mb-4 border-border text-secondary-text hover:text-main-text"
-        >
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Voltar para Admin
-        </Button>
-        
-        <h1 className="text-main-text mb-2 text-2xl font-bold">Gerenciamento de Conteúdo</h1>
-        <p className="text-secondary-text">Adicione, edite ou remova jogos e empresas.</p>
+    <div className="min-h-screen bg-[#121212] py-8">
+      <div className="container mx-auto px-6">
+        <div className="mb-8 flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl text-white mb-2 font-bold bg-gradient-to-r from-purple-500 to-blue-500 bg-clip-text text-transparent">
+              Gestão da Loja
+            </h1>
+            <p className="text-gray-400">
+              Relatórios e gerenciamento de conteúdo
+            </p>
+          </div>
+          <Button 
+             variant="outline" 
+             onClick={() => onNavigate('home')}
+             className="border-gray-700 hover:bg-gray-800 text-gray-300"
+          >
+             Voltar à Loja
+          </Button>
+        </div>
+
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="bg-[#1E1E1E] border-b border-gray-800 w-full justify-start p-0 h-auto rounded-none mb-6">
+            <TabsTrigger 
+              value="reports" 
+              className="data-[state=active]:bg-purple-600 data-[state=active]:text-white py-3 px-6 rounded-t-md rounded-b-none border-b-2 border-transparent data-[state=active]:border-purple-400 transition-all"
+            >
+              <FileText className="w-4 h-4 mr-2" /> 
+              Relatórios
+            </TabsTrigger>
+            <TabsTrigger 
+              value="games" 
+              className="data-[state=active]:bg-purple-600 data-[state=active]:text-white py-3 px-6 rounded-t-md rounded-b-none border-b-2 border-transparent data-[state=active]:border-purple-400 transition-all"
+            >
+              <Gamepad2 className="w-4 h-4 mr-2" /> 
+              Jogos
+            </TabsTrigger>
+            <TabsTrigger 
+              value="companies" 
+              className="data-[state=active]:bg-purple-600 data-[state=active]:text-white py-3 px-6 rounded-t-md rounded-b-none border-b-2 border-transparent data-[state=active]:border-purple-400 transition-all"
+            >
+              <LayoutList className="w-4 h-4 mr-2" /> 
+              Empresas
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="reports" className="mt-0">
+            {renderReports()}
+          </TabsContent>
+
+          <TabsContent value="games">
+             <div className="flex flex-col items-center justify-center py-20 bg-[#1E1E1E] rounded-lg border border-gray-800 text-center">
+                <Gamepad2 className="w-16 h-16 text-gray-600 mb-4" />
+                <h3 className="text-xl font-bold text-white">Gestão de Jogos</h3>
+                <p className="text-gray-400 max-w-md mt-2">
+                   Funcionalidade de cadastro em desenvolvimento.
+                </p>
+             </div>
+          </TabsContent>
+
+          <TabsContent value="companies">
+             <div className="flex flex-col items-center justify-center py-20 bg-[#1E1E1E] rounded-lg border border-gray-800 text-center">
+                <Building2 className="w-16 h-16 text-gray-600 mb-4" />
+                <h3 className="text-xl font-bold text-white">Gestão de Empresas</h3>
+                <p className="text-gray-400 max-w-md mt-2">
+                   Funcionalidade de cadastro em desenvolvimento.
+                </p>
+             </div>
+          </TabsContent>
+        </Tabs>
       </div>
-
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3 bg-secondary-bg border border-border">
-          <TabsTrigger value="companies" className="data-[state=active]:bg-accent-purple data-[state=active]:text-white">
-            <Building2 className="w-4 h-4 mr-2" /> Empresas
-          </TabsTrigger>
-          <TabsTrigger value="categories" className="data-[state=active]:bg-accent-purple data-[state=active]:text-white">
-            <Tag className="w-4 h-4 mr-2" /> Categorias
-          </TabsTrigger>
-          <TabsTrigger value="games" className="data-[state=active]:bg-accent-purple data-[state=active]:text-white">
-            <Gamepad2 className="w-4 h-4 mr-2" /> Jogos
-          </TabsTrigger>
-        </TabsList>
-
-        {/* CONTEÚDO EMPRESAS */}
-        <TabsContent value="companies" className="space-y-6 mt-6">
-          <div className="flex justify-between items-center">
-            <h2 className="text-main-text text-xl">Empresas ({companies.length})</h2>
-            <Button onClick={() => openDialog()} className="bg-accent-purple hover:bg-accent-hover">
-              <Plus className="w-4 h-4 mr-2" /> Nova Empresa
-            </Button>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {companies.map((company) => (
-                <Card key={company.id} className="bg-secondary-bg border-border">
-                  <CardHeader>
-                    <CardTitle className="text-main-text">{company.name || company.nome}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex justify-end space-x-2">
-                      <Button size="sm" variant="outline" onClick={() => openDialog(company)}><Edit className="w-4 h-4" /></Button>
-                      <Button size="sm" variant="outline" className="text-red-500 hover:bg-red-500/10" onClick={() => handleDelete(company.id)}><Trash2 className="w-4 h-4" /></Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-          </div>
-        </TabsContent>
-
-        {/* CONTEÚDO CATEGORIAS */}
-        <TabsContent value="categories" className="space-y-6 mt-6">
-          <div className="flex justify-between items-center">
-            <h2 className="text-main-text text-xl">Categorias ({categories.length})</h2>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {categories.map((category) => (
-                <Card key={category.id} className="bg-secondary-bg border-border opacity-80">
-                  <CardHeader>
-                    <CardTitle className="text-main-text">{category.name || category.nome}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                      <p className="text-xs text-secondary-text italic">Somente Leitura</p>
-                  </CardContent>
-                </Card>
-              ))}
-          </div>
-        </TabsContent>
-
-        {/* CONTEÚDO JOGOS */}
-        <TabsContent value="games" className="space-y-6 mt-6">
-          <div className="flex justify-between items-center">
-            <h2 className="text-main-text text-xl">Jogos ({games.length})</h2>
-            <Button onClick={() => openDialog()} className="bg-accent-purple hover:bg-accent-hover">
-              <Plus className="w-4 h-4 mr-2" /> Novo Jogo
-            </Button>
-          </div>
-           <div className="grid grid-cols-1 gap-4">
-              {games.map((game) => (
-                <Card key={game.id} className="bg-secondary-bg border-border flex flex-row items-center p-4">
-                  <div className="flex-1">
-                    <h3 className="text-main-text font-bold">{game.name || game.nome}</h3>
-                    <p className="text-secondary-text text-sm">R$ {game.price || game.preco}</p>
-                  </div>
-                  <div className="flex space-x-2">
-                      <Button size="sm" variant="outline" onClick={() => openDialog(game)}><Edit className="w-4 h-4" /></Button>
-                      <Button size="sm" variant="outline" className="text-red-500 hover:bg-red-500/10" onClick={() => handleDelete(game.id)}><Trash2 className="w-4 h-4" /></Button>
-                  </div>
-                </Card>
-              ))}
-          </div>
-        </TabsContent>
-      </Tabs>
-
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="bg-secondary-bg border-border max-w-2xl max-h-[90vh] overflow-y-auto text-main-text">
-          <DialogHeader>
-            <DialogTitle className="text-main-text">
-              {editingItem ? 'Editar' : 'Novo'} {activeTab === 'companies' ? 'Empresa' : 'Jogo'}
-            </DialogTitle>
-          </DialogHeader>
-          
-          {/* AQUI PASSAMOS AS PROPS PARA OS COMPONENTES EXTERNOS */}
-          {activeTab === 'companies' && (
-            <CompanyForm 
-                formData={formData} 
-                setFormData={setFormData} 
-                handleSubmit={handleSubmit} 
-                isLoading={isLoading} 
-                closeDialog={closeDialog} 
-            />
-          )}
-          {activeTab === 'games' && (
-            <GameForm 
-                formData={formData} 
-                setFormData={setFormData} 
-                handleSubmit={handleSubmit} 
-                isLoading={isLoading} 
-                closeDialog={closeDialog}
-                companies={companies}
-                categories={categories}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
