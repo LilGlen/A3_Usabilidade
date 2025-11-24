@@ -1,121 +1,102 @@
-import React, { useState } from "react";
-import { GAME_ASSETS } from "../../assets/assets-map";
+import React, { useState, useEffect } from "react";
+// Certifique-se de que o caminho para o seu assets-map esteja correto
+import { GAME_ASSETS } from "../../assets/assets-map"; 
 
-// Placeholder para imagem não encontrada (SVG em Base64)
-const ERROR_IMG_SRC =
-  "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODgiIGhlaWdodD0iODgiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgc3Ryb2tlPSIjMDAwIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiBvcGFjaXR5PSIuMyIgZmlsbD0ibm9uZSIgc3Ryb2tlLXdpZHRoPSIzLjciPjxyZWN0IHg9IjE2IiB5PSIxNiIgd2lkdGg9IjU2IiBoZWlnaHQ9IjU2IiByeD0iNiIvPjxwYXRoIGQ9Im0xNiA1OCAxNi0xOCAzMiAzMiIvPjxjaXJjbGUgY3g9IjUzIiBjeT0iMzUiIHI9IjciLz48L2NpcmNsZT4KCg==";
+// Imagem de Fallback Padrão (Estilo Gamer/Neon)
+// Você pode trocar por uma imagem local importada se preferir: import fallbackLocal from '../../assets/fallback.png'
+const DEFAULT_FALLBACK = "https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=800&h=600&fit=crop&q=80";
 
 // --- Função de Construção de Caminho ---
-function getGameAssetPath(gameName: string): string {
-  if (!gameName) {
-    return "";
-  }
+function getGameAssetPath(gameName: string): string | null {
+  if (!gameName) return null;
 
-  // 1. Normaliza o nome do jogo
+  // 1. Normaliza o nome do jogo para bater com as chaves do objeto (ex: "God of War" -> "god_of_war")
   const nomeNormalizado = gameName
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "") // Remove acentos
-    .replace(/[^a-z0-9\s-]/g, "") // Mantém letras, números, espaços e hífen (para Half-Life)
-    .replace(/\s/g, "_"); // Substitui espaços por _
+    .replace(/[^a-z0-9\s-]/g, "") // Mantém letras, números, espaços e hífen
+    .replace(/\s+/g, "_"); // Substitui espaços por _
 
   // 2. Busca o ativo no mapa estático
-  const assetPath = GAME_ASSETS[nomeNormalizado as keyof typeof GAME_ASSETS];
+  // @ts-ignore - Ignora erro se a chave não existir
+  const assetPath = GAME_ASSETS[nomeNormalizado];
 
-  // Se o ativo for encontrado no mapa, ele será a URL pública (string); caso contrário, será undefined.
-  return assetPath || ""; // Retorna a URL se existir, senão uma string vazia para forçar o fallback
+  return assetPath || null;
 }
 
 // --- Componente de Imagem com Fallback ---
-interface ImageWithFallbackProps
-  extends React.ImgHTMLAttributes<HTMLImageElement> {
-  gameName: string;
-  src?: string;
+interface ImageWithFallbackProps extends React.ImgHTMLAttributes<HTMLImageElement> {
+  gameName?: string; // Opcional, pois as vezes só queremos passar o src
+  fallbackSrc?: string; // Permite passar um fallback personalizado se quiser
 }
 
 export function ImageWithFallback({
-  gameName,
+  gameName = "",
+  src,
   alt,
-  style,
   className,
+  style,
+  fallbackSrc,
   ...rest
 }: ImageWithFallbackProps) {
-  const [didFailLocal, setDidFailLocal] = useState(false);
-  const [didFailFallback, setDidFailFallback] = useState(false);
+  
+  const finalFallback = fallbackSrc || DEFAULT_FALLBACK;
+  
+  // Estado para controlar a fonte atual da imagem
+  const [imgSrc, setImgSrc] = useState<string>("");
+  const [hasError, setHasError] = useState(false);
 
-  const assetPath = getGameAssetPath(gameName);
+  useEffect(() => {
+    // Resetar estado de erro quando as props mudarem
+    setHasError(false);
+    
+    // 1. Prioridade: SRC direto (Link da API ou Import local)
+    // Isso garante que se você salvar uma URL no admin, ela será usada.
+    if (src && src.trim() !== "") {
+      setImgSrc(src);
+      return;
+    }
 
-  let finalSrc = assetPath;
-  let currentAttempt = "local";
+    // 2. Prioridade: Asset Local Automático (baseado no nome do jogo)
+    // Se não tiver src, tenta achar no mapa de assets.
+    const assetPath = getGameAssetPath(gameName);
+    if (assetPath) {
+      setImgSrc(assetPath);
+      return;
+    }
 
-  // 1. Lógica de Decisão da Fonte (FinalSrc)
+    // 3. Se não tiver nada, seta o fallback imediatamente
+    setImgSrc(finalFallback);
+    
+  }, [src, gameName, finalFallback]);
 
-  if (didFailLocal) {
-    // Se a tentativa local falhou, a próxima tentativa é o src da prop
-    finalSrc = rest.src || ERROR_IMG_SRC;
-    currentAttempt = "fallback";
-  }
-
-  if (didFailFallback || finalSrc === ERROR_IMG_SRC) {
-    // Se a tentativa do fallback da API falhou, ou se não havia URL na prop 'src', vamos para o erro final.
-    finalSrc = ERROR_IMG_SRC;
-    currentAttempt = "error";
-  }
-
-  // 2. Handler de Erro
+  // Função disparada se a imagem definida falhar ao carregar (link quebrado)
   const handleError = () => {
-    if (currentAttempt === "local") {
-      console.error(
-        `[DEBUG - ${gameName}] ERRO DE CARREGAMENTO LOCAL: Tentativa de ${assetPath} falhou.`
-      );
-      setDidFailLocal(true); // Dispara a próxima renderização para tentar o fallback da API
-    } else if (currentAttempt === "fallback") {
-      console.error(
-        `[DEBUG - ${gameName}] ERRO DE CARREGAMENTO DE FALLBACK (API): Tentativa de ${
-          rest.src ? rest.src.substring(0, 50) + "..." : "Placeholder Vazio"
-        } falhou.`
-      );
-      setDidFailFallback(true); // Dispara a próxima renderização para mostrar o SVG de erro
+    if (!hasError) {
+      console.warn(`[ImageFallback] Falha ao carregar: "${imgSrc}". Alternando para fallback.`);
+      setHasError(true);
+      setImgSrc(finalFallback);
     }
   };
 
-  // 3. Renderização
-  const isErrorFallback =
-    currentAttempt === "error" || finalSrc === ERROR_IMG_SRC;
-
-  if (isErrorFallback) {
-    console.warn(`[DEBUG - ${gameName}] FALHA TOTAL: Usando Imagem de Erro.`);
-    return (
-      <div
-        className={`inline-block bg-gray-100 text-center align-middle ${
-          className ?? ""
-        }`}
-        style={style}
-      >
-        <div className="flex items-center justify-center w-full h-full">
-          <img
-            src={ERROR_IMG_SRC}
-            alt={`Erro ao carregar imagem de ${gameName}`}
-            {...rest}
-            style={{
-              maxHeight: "100%",
-              maxWidth: "100%",
-              objectFit: "contain",
-            }}
-          />
-        </div>
-      </div>
-    );
-  }
-
   return (
     <img
-      src={finalSrc}
-      alt={alt ?? `Capa do jogo ${gameName}`}
-      className={className}
-      style={style}
-      {...rest}
+      src={imgSrc || finalFallback}
+      alt={alt ?? (gameName ? `Capa do jogo ${gameName}` : "Imagem do jogo")}
       onError={handleError}
+      className={`transition-all duration-500 ${className}`}
+      style={{
+        objectFit: "cover",
+        objectPosition: "center",
+        width: "100%",
+        height: "100%",
+        // Se deu erro e está mostrando o fallback, aplica um efeito visual (opcional)
+        opacity: hasError ? 0.8 : 1,
+        filter: hasError ? "grayscale(40%)" : "none", 
+        ...style
+      }}
+      {...rest}
     />
   );
 }

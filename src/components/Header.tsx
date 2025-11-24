@@ -86,7 +86,7 @@ export function Header({ onNavigate, onSearchChange }: HeaderProps) {
             <div className="relative w-full">
               <input
                 type="search"
-                placeholder="Buscar por jogos ou descrição..."
+                placeholder="Buscar por jogos"
                 value={localSearchTerm}
                 onChange={handleSearchInputChange}
                 className="w-full bg-[#1A1A1A] border border-[#404040] text-white placeholder-gray-400 rounded-lg py-2.5 md:py-3 px-4 pr-12 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition"

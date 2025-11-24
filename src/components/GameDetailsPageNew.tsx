@@ -1,4 +1,3 @@
-// GameDetailsPageNew.tsx
 import React, { useEffect, useState } from "react";
 import {
   Star,
@@ -7,6 +6,7 @@ import {
   Loader2,
   ArrowLeft,
   Send,
+  Calendar,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
@@ -17,7 +17,7 @@ import { useAPI } from "./useAPI";
 import { useAuth } from "./AuthContext";
 import { useCart } from "./CartContext";
 import { Avatar } from "./Avatar";
-import { toast } from "sonner";
+import { useToast } from "./ToastProvider";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
 
 interface GameDetailsPageProps {
@@ -29,40 +29,116 @@ export function GameDetailsPageNew({
   gameId,
   onNavigate,
 }: GameDetailsPageProps) {
-  const [game, setGame] = useState<any | null>(null); // será preenchido com result.jogo
+  const [game, setGame] = useState<any | null>(null);
   const [reviews, setReviews] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [userRating, setUserRating] = useState(0);
   const [userComment, setUserComment] = useState("");
-  const [hasSpoilers, setHasSpoilers] = useState(false);
   const [submittingReview, setSubmittingReview] = useState(false);
   const [activeMedia, setActiveMedia] = useState(0);
+  const [isAddingToWishlist, setIsAddingToWishlist] = useState(false);
 
   const api = useAPI();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const { addToCart } = useCart();
+  const { showToast } = useToast();
 
   useEffect(() => {
-    if (gameId) loadGameDetails();
+    if (!gameId) {
+      setIsLoading(false);
+      return;
+    }
+    loadGameDetails();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameId]);
 
   const loadGameDetails = async () => {
     setIsLoading(true);
     try {
-      const [gameResult, reviewsResult] = await Promise.all([
+      // 1. Buscamos Jogo, Reviews, Empresas E AGORA Categorias
+      const [gameResult, reviewsResponse, companiesResult, categoriesResult] = await Promise.all([
         api.getGame(gameId || ""),
         api.getGameReviews(gameId || ""),
+        api.getCompanies(),
+        api.getCategories(), // Novo: Buscando categorias
       ]);
 
-      if (gameResult?.jogo) setGame(gameResult.jogo);
-      else setGame(null);
+      // --- LÓGICA DE RECUPERAÇÃO DO NOME DA EMPRESA ---
+      let empresaNome = "Desenvolvedora Desconhecida";
+      const companiesList = Array.isArray(companiesResult) 
+        ? companiesResult 
+        : (companiesResult?.companies || []);
 
-      if (reviewsResult?.reviews) setReviews(reviewsResult.reviews);
-      else setReviews([]);
+      if (gameResult) {
+         const empresaId = gameResult.fk_empresa || gameResult.fkEmpresa;
+         if (empresaId) {
+            const foundCompany = companiesList.find((c: any) => c.id === empresaId);
+            if (foundCompany) empresaNome = foundCompany.name || foundCompany.nome;
+         } else if (gameResult.empresa) {
+            empresaNome = gameResult.empresa;
+         }
+      }
+
+      // --- LÓGICA DE RECUPERAÇÃO DO NOME DA CATEGORIA (INCREMENTADO) ---
+      let categoriaNome = "Geral";
+      const categoriesList = Array.isArray(categoriesResult)
+        ? categoriesResult
+        : (categoriesResult?.categories || []);
+
+      if (gameResult) {
+          const categoriaId = gameResult.fk_categoria || gameResult.fkCategoria;
+          if (categoriaId) {
+              // Procura na lista de categorias pelo ID
+              const foundCategory = categoriesList.find((c: any) => c.id === categoriaId);
+              if (foundCategory) {
+                  categoriaNome = foundCategory.name || foundCategory.nome;
+              }
+          } else if (gameResult.categoria) {
+              // Fallback se já vier preenchido
+              categoriaNome = gameResult.categoria;
+          }
+      }
+
+      // Processamento das avaliações
+      const reviewsList = reviewsResponse?.avaliacoes || [];
+      const freshRating = reviewsResponse?.media !== undefined ? reviewsResponse.media : (gameResult?.nota_media || 0);
+
+      if (gameResult) {
+        const mappedGame = {
+          ...gameResult,
+          id: gameResult.id,
+          nome: gameResult.nome || gameResult.titulo || gameResult.name,
+          descricao: gameResult.descricao || gameResult.description,
+          preco: gameResult.preco || gameResult.price || 0,
+          nota_media: freshRating, 
+          empresa: empresaNome,    // Nome da empresa resolvido
+          categoria: categoriaNome, // Nome da categoria resolvido
+          imagem_url: gameResult.imagem_url || undefined,
+        };
+        setGame(mappedGame);
+      } else {
+        setGame(null);
+      }
+
+      if (Array.isArray(reviewsList)) {
+        const mappedReviews = reviewsList.map((review: any) => ({
+          id: review.id,
+          usuario: review.usuario?.nome || review.nome_usuario || "Usuário",
+          nota: review.nota || review.rating || 0,
+          comentario: review.comentario || review.comment || "",
+          data: review.data_criacao || review.created_at || new Date().toISOString(),
+        }));
+        setReviews(mappedReviews);
+      } else {
+        setReviews([]);
+      }
     } catch (err) {
       console.error("Error loading game details:", err);
-      toast.error("Erro ao carregar detalhes do jogo");
+      showToast({ 
+        type: "error", 
+        title: "Erro", 
+        message: "Erro ao carregar detalhes do jogo" 
+      });
       setGame(null);
       setReviews([]);
     } finally {
@@ -72,62 +148,173 @@ export function GameDetailsPageNew({
 
   const handleAddToCart = async () => {
     if (!isAuthenticated) {
-      toast.error("Faça login para adicionar ao carrinho");
+      showToast({ 
+        type: "info", 
+        title: "Login necessário", 
+        message: "Faça login para adicionar ao carrinho" 
+      });
       return;
     }
     if (!game?.id) {
-      toast.error("ID do jogo inválido");
+      showToast({ type: "error", title: "Erro", message: "ID do jogo inválido" });
       return;
     }
 
     const result = await addToCart(Number(game.id));
+    
     if (result === true) {
-      toast.success(
-        `${game.nome || game.name || "Jogo"} adicionado ao carrinho!`
-      );
+      showToast({ 
+        type: "success", 
+        title: "Adicionado!", 
+        message: `${game.nome} adicionado ao carrinho.` 
+      });
     } else if (result === "already-in-cart") {
-      toast.info(`${game.nome || game.name || "Jogo"} já está no carrinho!`);
+      showToast({ 
+        type: "info", 
+        title: "Atenção", 
+        message: `${game.nome} já está no carrinho!` 
+      });
     } else {
-      toast.error("Erro ao adicionar ao carrinho. Tente novamente.");
+      showToast({ 
+        type: "error", 
+        title: "Erro", 
+        message: "Não foi possível adicionar ao carrinho." 
+      });
     }
   };
 
-  const handleSubmitReview = async (e: React.FormEvent) => {
+ // --- LÓGICA DA LISTA DE DESEJOS (ATUALIZADA) ---
+  const handleAddToWishlist = async () => {
+    if (!isAuthenticated) {
+      showToast({ 
+        type: "info", 
+        title: "Login necessário", 
+        message: "Faça login para adicionar à lista de desejos" 
+      });
+      return;
+    }
+    if (!game?.id) {
+      showToast({ type: "error", title: "Erro", message: "ID do jogo inválido" });
+      return;
+    }
+
+    setIsAddingToWishlist(true);
+    try {
+      const result = await api.addToWishlist(Number(game.id));
+      
+      // Verifica Sucesso
+      if (result?.item || result?.success) {
+        showToast({ 
+          type: "success", 
+          title: "Sucesso", 
+          message: "Item adicionado a lista de desejo"
+        });
+      } 
+      // Verifica se já existe (Algumas APIs retornam sucesso falso com mensagem)
+      else if (result?.message === "Jogo já está na lista de desejos" || (result as any)?.error === "Conflict") {
+         showToast({ 
+          type: "info", 
+          title: "Atenção", 
+          message: "Item já adicionado a lista de desejos"
+        });
+      }
+      else {
+        showToast({ 
+          type: "error", 
+          title: "Item Adicionado", 
+          message: "Item já adicionado a lista de desejos"
+        });
+      }
+    } catch (err: any) {
+      console.error("Error adding to wishlist:", err);
+      // Tratamento de erro HTTP (409 Conflict)
+      if (err?.status === 409 || err?.body?.message?.includes("já está na lista")) {
+        showToast({ 
+          type: "info", 
+          title: "Atenção", 
+          message: "Item já adicionado a lista de desejos"
+        });
+      } else {
+        showToast({ 
+          type: "error", 
+          title: "Erro", 
+          message: "Não foi possível adicionar a lista de desejos"
+        });
+      }
+    } finally {
+      setIsAddingToWishlist(false);
+    }
+  };
+
+    const handleSubmitReview = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isAuthenticated) {
-      toast.error("Faça login para avaliar jogos");
+      showToast({ 
+        type: "info", 
+        title: "Login necessário", 
+        message: "Faça login para avaliar jogos" 
+      });
       return;
     }
-    if (!gameId) {
-      toast.error("ID do jogo inválido");
-      return;
-    }
+    if (!gameId) return;
     if (userRating === 0) {
-      toast.error("Selecione uma nota de 1 a 5 estrelas");
+      showToast({ 
+        type: "warning", 
+        title: "Avaliação", 
+        message: "Selecione uma nota de 1 a 5 estrelas" 
+      });
       return;
     }
 
     setSubmittingReview(true);
     try {
-      // Backend espera { jogoId, nota, comentario }
       const result = await api.createReview({
         jogoId: Number(gameId),
         nota: userRating,
         comentario: userComment,
       });
+      console.log(result, result?.status)
 
-      if (result?.review) {
-        toast.success("Avaliação enviada!");
+      if (result.success) {
+        showToast({ 
+          type: "success", 
+          title: "Sucesso!", 
+          message: "Avaliação encaminhada com sucesso"
+        });
         setUserRating(0);
         setUserComment("");
         setHasSpoilers(false);
-        await loadGameDetails();
-      } else {
-        toast.error("Erro ao enviar avaliação");
+        await loadGameDetails(); // Recarrega para atualizar a lista e média
+      } else if(result.message === "Você já avaliou este jogo."){
+          showToast({ 
+          type: "info", 
+          title: "Atenção", 
+          message: "Item já avaliado"
+        });
+
       }
-    } catch (err) {
+      else {
+        showToast({ 
+          type: "error", 
+          title: "Erro", 
+          message: "Não foi possível avaliar este item" 
+        });
+      }
+    } catch (err: any) {
       console.error("Error submitting review:", err);
-      toast.error("Erro ao enviar avaliação");
+      if (err?.status === 400 && err?.body?.message === "Você já avaliou este jogo.") {
+         showToast({ 
+          type: "info", 
+          title: "Atenção", 
+          message: "Item já avaliado"
+        });
+      } else {
+        showToast({ 
+          type: "error", 
+          title: "Erro", 
+          message: "Não foi possível avaliar este item" 
+        });
+      }
     } finally {
       setSubmittingReview(false);
     }
@@ -145,7 +332,9 @@ export function GameDetailsPageNew({
     return (
       <div className="min-h-screen bg-main-bg flex items-center justify-center">
         <Card className="bg-secondary-bg border-border p-8 text-center">
-          <p className="text-main-text mb-4">Jogo não encontrado</p>
+          <p className="text-main-text mb-4">
+            {!gameId ? "ID do jogo não encontrado." : "Jogo não encontrado."}
+          </p>
           <Button
             onClick={() => onNavigate("home")}
             className="bg-accent-purple hover:bg-accent-hover"
@@ -157,17 +346,39 @@ export function GameDetailsPageNew({
     );
   }
 
-  const gameImage =
-    game.imagem_url ||
-    game.image ||
-    "https://images.unsplash.com/photo-1625314887424-9f190599bd56?w=800&h=600";
-
   const mediaItems = [
-    gameImage,
-    "https://images.unsplash.com/photo-1708577269890-12a58e153589?w=800",
-    "https://images.unsplash.com/photo-1705594975210-02cbcc7af5ad?w=800",
-    "https://images.unsplash.com/photo-1723360480597-d21deccaf3d0?w=800",
+    game.imagem_url, // 0: Capa
+    "https://images.unsplash.com/photo-1708577269890-12a58e153589?w=800", // 1
+    "https://images.unsplash.com/photo-1705594975210-02cbcc7af5ad?w=800", // 2
+    "https://images.unsplash.com/photo-1723360480597-d21deccaf3d0?w=800", // 3
   ];
+
+  const renderActiveMedia = () => {
+    if (activeMedia === 0) {
+      return (
+        <ImageWithFallback
+          src={game.imagem_url || undefined}
+          gameName={game.nome}
+          alt={`${game.nome} - Capa`}
+          className="w-full h-64 sm:h-96 object-cover transition-all duration-300"
+        />
+      );
+    } else {
+      return (
+        <img
+          src={mediaItems[activeMedia]}
+          alt={`Screenshot ${activeMedia}`}
+          className="w-full h-64 sm:h-96 object-cover transition-all duration-300"
+          onError={(e) => {
+            e.currentTarget.src = "https://placehold.co/800x600?text=Sem+Imagem";
+          }}
+        />
+      );
+    }
+  };
+
+  const formattedPrice = (game.preco || 0).toFixed(2).replace('.', ',');
+  const formattedRating = (game.nota_media || 0).toFixed(1).replace('.', ',');
 
   return (
     <div className="bg-main-bg min-h-screen">
@@ -181,143 +392,157 @@ export function GameDetailsPageNew({
         </Button>
 
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 sm:gap-12">
+          
+          {/* COLUNA ESQUERDA: IMAGENS */}
           <div className="lg:col-span-3">
-            <div className="bg-secondary-bg rounded-xl overflow-hidden mb-4">
-              <ImageWithFallback
-                src={mediaItems[activeMedia]}
-                alt={`${game.nome || game.name} - Imagem ${activeMedia + 1}`}
-                gameName= {game.nome}
-                className="w-full h-64 sm:h-80 object-cover"
-              />
+            <div className="bg-secondary-bg rounded-xl overflow-hidden mb-4 border border-border">
+              {renderActiveMedia()}
             </div>
 
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-4 gap-3">
               {mediaItems.map((m, idx) => (
                 <button
                   key={idx}
                   onClick={() => setActiveMedia(idx)}
-                  className={`cursor-pointer rounded-lg border-2 ${
+                  className={`relative overflow-hidden rounded-lg border-2 transition-all duration-200 ${
                     activeMedia === idx
-                      ? "border-accent-purple"
-                      : "border-transparent hover:border-accent-purple"
+                      ? "border-accent-purple opacity-100 scale-105"
+                      : "border-transparent hover:border-accent-purple/50 opacity-70 hover:opacity-100"
                   }`}
                 >
-                  <ImageWithFallback
-                    src={m}
-                    alt={`Miniatura ${idx + 1}`}
-                    gameName= {game.nome}
-                    className="w-full h-16 sm:h-20 object-cover rounded-lg"
-                  />
+                  {idx === 0 ? (
+                    <ImageWithFallback
+                      src={game.imagem_url || undefined}
+                      gameName={game.nome}
+                      alt="Miniatura Capa"
+                      className="w-full h-20 sm:h-24 object-cover"
+                    />
+                  ) : (
+                    <img
+                      src={m}
+                      alt={`Miniatura ${idx}`}
+                      className="w-full h-20 sm:h-24 object-cover"
+                    />
+                  )}
                 </button>
               ))}
             </div>
           </div>
 
+          {/* COLUNA DIREITA: DETALHES */}
           <div className="lg:col-span-2">
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl text-main-text mb-2">
-              {game.nome || game.name}
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-main-text mb-2 leading-tight">
+              {game.nome}
             </h1>
-            <p className="text-secondary-text mb-4">
-              Por{" "}
-              <span className="text-main-text">
-                {game.empresa || game.company}
+            
+            {/* SUBTÍTULO DA EMPRESA E CATEGORIA */}
+            <p className="text-secondary-text mb-6 text-lg">
+              <span className="font-semibold text-accent-purple">
+                {game.empresa}
               </span>{" "}
-              | {game.categoria || game.category}
+              • {game.categoria}
             </p>
 
-            <div className="flex items-center mb-6">
+            <div className="flex items-center mb-8 bg-secondary-bg/50 p-3 rounded-lg w-fit border border-border/50">
               <div className="flex text-yellow-400">
                 {[...Array(5)].map((_, i) => (
                   <Star
                     key={i}
                     className={`w-5 h-5 ${
-                      i < Math.round(game.nota_media || game.rating || 0)
+                      i < Math.round(game.nota_media || 0)
                         ? "fill-current"
                         : "text-gray-600"
                     }`}
                   />
                 ))}
               </div>
-              <span className="ml-2 text-secondary-text">
-                {(game.nota_media || game.rating)?.toFixed?.(1) || "0.0"} (
-                {reviews.length} avaliações)
+              <span className="ml-3 text-main-text font-medium">
+                {formattedRating} 
+                <span className="text-secondary-text ml-1 text-sm font-normal">
+                  ({reviews.length} avaliações)
+                </span>
               </span>
             </div>
 
-            <div className="bg-secondary-bg p-4 sm:p-6 rounded-xl">
-              <p className="text-3xl text-main-text mb-6">
-                R$ {(game.preco || game.price || 0).toFixed(2)}
+            <div className="bg-secondary-bg p-6 rounded-xl border border-border shadow-sm">
+              <p className="text-4xl font-bold text-main-text mb-8">
+                R$ {formattedPrice}
               </p>
 
-              <Button
-                className="w-full bg-accent-purple hover:bg-accent-hover mb-4"
-                onClick={handleAddToCart}
-              >
-                <ShoppingCart className="w-5 h-5 mr-2" /> Adicionar ao Carrinho
-              </Button>
+              <div className="flex flex-col gap-3">
+                <Button
+                  className="w-full bg-accent-purple hover:bg-accent-hover text-white py-6 text-lg shadow-lg shadow-accent-purple/20 transition-all hover:scale-[1.02]"
+                  onClick={handleAddToCart}
+                >
+                  <ShoppingCart className="w-6 h-6 mr-2" /> 
+                  Adicionar ao Carrinho
+                </Button>
 
-              <Button
-                variant="outline"
-                className="w-full border-secondary-text text-secondary-text"
-                onClick={() =>
-                  toast.info("Função de wishlist ainda não implementada aqui")
-                }
-              >
-                <Heart className="w-5 h-5 mr-2" /> Adicionar à Lista de Desejos
-              </Button>
+                <Button
+                  variant="outline"
+                  className="w-full border-secondary-text/30 text-secondary-text hover:text-main-text hover:bg-secondary-bg hover:border-accent-purple/50 py-6 text-lg transition-colors"
+                  onClick={handleAddToWishlist}
+                  disabled={isAddingToWishlist}
+                >
+                  {isAddingToWishlist ? (
+                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                  ) : (
+                    <Heart className="w-5 h-5 mr-2" />
+                  )}
+                  Lista de Desejos
+                </Button>
+              </div>
             </div>
           </div>
 
-          <div className="lg:col-span-5 mt-8">
-            <Tabs defaultValue="descricao">
-              <TabsList className="grid grid-cols-3 border-b border-border">
-                <TabsTrigger value="descricao">Descrição</TabsTrigger>
-                <TabsTrigger value="requisitos">Requisitos</TabsTrigger>
-                <TabsTrigger value="avaliacoes">
+          {/* TABS */}
+          <div className="lg:col-span-5 mt-12">
+            <Tabs defaultValue="descricao" className="w-full">
+              <TabsList className="w-full justify-start bg-transparent border-b border-border p-0 h-auto gap-8 rounded-none">
+                <TabsTrigger 
+                  value="descricao" 
+                  className="rounded-none border-b-2 border-transparent data-[state=active]:border-accent-purple data-[state=active]:bg-transparent data-[state=active]:text-accent-purple pb-4 text-lg px-0 transition-colors hover:text-main-text"
+                >
+                  Descrição
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="avaliacoes"
+                  className="rounded-none border-b-2 border-transparent data-[state=active]:border-accent-purple data-[state=active]:bg-transparent data-[state=active]:text-accent-purple pb-4 text-lg px-0 transition-colors hover:text-main-text"
+                >
                   Avaliações ({reviews.length})
                 </TabsTrigger>
               </TabsList>
 
-              <TabsContent value="descricao" className="py-8">
-                <p className="text-secondary-text leading-relaxed">
-                  {game.descricao ||
-                    game.description ||
-                    "Este jogo não possui descrição disponível."}
-                </p>
-                {game.features && (
-                  <ul className="list-disc list-inside mt-6 text-secondary-text">
-                    {game.features.map((f: string, i: number) => (
-                      <li key={i}>{f}</li>
-                    ))}
-                  </ul>
-                )}
-              </TabsContent>
-
-              <TabsContent value="requisitos" className="py-8">
-                <p className="text-secondary-text">Requisitos fixos mockados</p>
+              <TabsContent value="descricao" className="py-8 animate-in fade-in-50 duration-500">
+                <div className="prose prose-invert max-w-none">
+                  <p className="text-secondary-text leading-relaxed text-lg text-pretty">
+                    {game.descricao || "Este jogo não possui descrição disponível."}
+                  </p>
+                </div>
               </TabsContent>
 
               <TabsContent value="avaliacoes" className="py-8">
                 {isAuthenticated && (
                   <form
                     onSubmit={handleSubmitReview}
-                    className="bg-secondary-bg p-6 rounded-xl mb-8"
+                    className="bg-secondary-bg p-6 rounded-xl mb-8 border border-border shadow-sm"
                   >
-                    <div className="mb-4">
-                      <label className="text-secondary-text">Sua nota:</label>
-                      <div className="flex mt-2">
+                    <h3 className="text-main-text font-bold mb-6 text-xl">Escreva sua análise</h3>
+                    <div className="mb-6">
+                      <label className="text-secondary-text block mb-3 text-sm font-semibold">Sua avaliação</label>
+                      <div className="flex gap-2">
                         {[1, 2, 3, 4, 5].map((s) => (
                           <button
                             type="button"
                             key={s}
                             onClick={() => setUserRating(s)}
-                            className="p-1"
+                            className="transition-all duration-200 hover:scale-110 focus:outline-none"
                           >
                             <Star
-                              className={`w-6 h-6 ${
+                              className={`w-10 h-10 ${
                                 s <= userRating
-                                  ? "text-yellow-400 fill-current"
-                                  : "text-gray-600"
+                                  ? "text-yellow-400 fill-current drop-shadow-lg"
+                                  : "text-gray-500 hover:text-yellow-300"
                               }`}
                             />
                           </button>
@@ -325,89 +550,74 @@ export function GameDetailsPageNew({
                       </div>
                     </div>
 
-                    <Textarea
-                      value={userComment}
-                      onChange={(e) => setUserComment(e.target.value)}
-                      placeholder="Escreva sua avaliação..."
-                      className="bg-main-bg border border-border text-main-text mb-4"
-                    />
-
-                    <label className="flex items-center gap-2 text-secondary-text">
-                      <input
-                        type="checkbox"
-                        checked={hasSpoilers}
-                        onChange={(e) => setHasSpoilers(e.target.checked)}
+                    <div className="mb-6">
+                      <Textarea
+                        value={userComment}
+                        onChange={(e) => setUserComment(e.target.value)}
+                        placeholder="Compartilhe sua experiência com este jogo..."
+                        className="bg-main-bg border border-border text-main-text min-h-[120px] resize-none focus:ring-2 focus:ring-accent-purple/30 transition-all"
+                        maxLength={500}
                       />
-                      Contém spoilers
-                    </label>
+                    </div>
 
-                    <Button
-                      type="submit"
-                      className="mt-4 bg-accent-purple hover:bg-accent-hover"
-                      disabled={submittingReview}
-                    >
-                      {submittingReview ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Enviando...
-                        </>
-                      ) : (
-                        <>
-                          <Send className="w-4 h-4 mr-2" />
-                          Enviar Avaliação
-                        </>
-                      )}
-                    </Button>
+                    <div className="flex flex-col sm:flex-row justify-end items-start sm:items-center gap-4">
+                      <Button
+                        type="submit"
+                        className="bg-accent-purple hover:bg-accent-hover px-8 py-3 text-base font-semibold min-w-[140px] shadow-lg shadow-accent-purple/20"
+                        disabled={submittingReview || userRating === 0}
+                      >
+                        {submittingReview ? (
+                          <>
+                            <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                            Enviando...
+                          </>
+                        ) : (
+                          <>
+                            <Send className="w-5 h-5 mr-2" />
+                            Publicar
+                          </>
+                        )}
+                      </Button>
+                    </div>
                   </form>
                 )}
 
                 {reviews.length === 0 ? (
-                  <p className="text-secondary-text text-center">
-                    Nenhuma avaliação ainda.
-                  </p>
+                  <div className="text-center py-16 bg-secondary-bg/30 rounded-xl border-2 border-dashed border-border">
+                    <p className="text-secondary-text text-lg">Nenhuma avaliação ainda.</p>
+                  </div>
                 ) : (
-                  reviews.map((review, idx) => (
-                    <div key={idx} className="border-b border-border py-4">
-                      <div className="flex gap-3 items-center">
-                        <Avatar
-                          name={review.userName || review.usuario || "Usuário"}
-                          size={40}
-                        />
-                        <div>
-                          <p className="text-main-text">
-                            {review.userName || review.usuario}
-                          </p>
-                          <div className="flex">
-                            {[...Array(5)].map((_, i) => (
-                              <Star
-                                key={i}
-                                className={`w-3 h-3 ${
-                                  i < (review.rating ?? review.nota)
-                                    ? "fill-current text-yellow-400"
-                                    : "text-gray-600"
-                                }`}
-                              />
-                            ))}
+                  <div className="space-y-4">
+                    {reviews.map((review, idx) => (
+                      <div key={review.id || idx} className="bg-secondary-bg p-6 rounded-xl border border-border">
+                        <div className="flex justify-between items-start mb-4">
+                          <div className="flex gap-4 items-center">
+                            <Avatar name={review.usuario || "Usuário"} size={48} />
+                            <div>
+                              <p className="text-main-text font-bold text-lg">{review.usuario}</p>
+                              <div className="flex text-yellow-400 mt-1">
+                                {[...Array(5)].map((_, i) => (
+                                  <Star
+                                    key={i}
+                                    className={`w-4 h-4 ${
+                                      i < (review.nota || 0) ? "fill-current" : "text-gray-600"
+                                    }`}
+                                  />
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Calendar className="w-3 h-3 text-secondary-text" />
+                            <span className="text-xs text-secondary-text">
+                                {new Date(review.data).toLocaleDateString()}
+                            </span>
                           </div>
                         </div>
+                        <p className="text-secondary-text">{review.comentario}</p>
                       </div>
-
-                      {review.hasSpoilers ? (
-                        <details className="bg-yellow-500/10 border border-yellow-500/30 p-4 mt-3 rounded">
-                          <summary className="cursor-pointer">
-                            ⚠️ Contém spoilers
-                          </summary>
-                          <p className="text-secondary-text mt-3">
-                            {review.comment || review.comentario}
-                          </p>
-                        </details>
-                      ) : (
-                        <p className="text-secondary-text mt-3">
-                          {review.comment || review.comentario}
-                        </p>
-                      )}
-                    </div>
-                  ))
+                    ))}
+                  </div>
                 )}
               </TabsContent>
             </Tabs>

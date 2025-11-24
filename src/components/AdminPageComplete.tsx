@@ -6,7 +6,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { PageType } from '../App';
 import { useAuth } from './AuthContext';
 import { useAPI } from './useAPI';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner'; // Ajuste para seu provider se necessário
 import { 
   TrendingUp,
   Users,
@@ -30,11 +30,12 @@ const COLORS = ['#9146FF', '#00BFFF', '#28A745', '#F39C12', '#DC3545'];
 export function AdminPageComplete({ onNavigate }: AdminPageCompleteProps) {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isLoading, setIsLoading] = useState(true);
+  
+  // Estados calculados no Frontend
   const [statistics, setStatistics] = useState<any>(null);
   const [topGames, setTopGames] = useState<any[]>([]);
-  const [topGamesByCompany, setTopGamesByCompany] = useState<any[]>([]);
   const [rankings, setRankings] = useState<any>(null);
-  const [rankingsByCategory, setRankingsByCategory] = useState<any[]>([]);
+  const [salesByCategory, setSalesByCategory] = useState<any[]>([]);
   
   const { user, logout, hasPermission } = useAuth();
   const api = useAPI();
@@ -64,43 +65,90 @@ export function AdminPageComplete({ onNavigate }: AdminPageCompleteProps) {
   }
 
   useEffect(() => {
-    loadReports();
+    loadDataAndCalculateStats();
   }, []);
 
-  const loadReports = async () => {
+  const loadDataAndCalculateStats = async () => {
     setIsLoading(true);
     try {
-      const [
-        statsResult,
-        topGamesResult,
-        topByCompanyResult,
-        rankingsResult,
-        rankingsByCategoryResult
-      ] = await Promise.all([
-        api.getStatistics(),
-        api.getTopGames(),
-        api.getTopGamesByCompany(),
-        api.getRankings(),
-        api.getRankingsByCategory()
+      // 1. Buscar dados brutos de todas as entidades
+      const [gamesResponse, salesResponse, reviewsResponse, categoriesResponse] = await Promise.all([
+        api.getAllGames(),
+        api.getAllSales(), // Vendas
+        api.getAllReviews(),
+        api.getCategories(),
       ]);
 
-      if (statsResult?.success) {
-        setStatistics(statsResult.statistics);
-      }
-      if (topGamesResult?.success) {
-        setTopGames(topGamesResult.topGames || []);
-      }
-      if (topByCompanyResult?.success) {
-        setTopGamesByCompany(topByCompanyResult.topGamesByCompany || []);
-      }
-      if (rankingsResult?.success) {
-        setRankings(rankingsResult.rankings);
-      }
-      if (rankingsByCategoryResult?.success) {
-        setRankingsByCategory(rankingsByCategoryResult.rankingsByCategory || []);
-      }
+      const games = Array.isArray(gamesResponse) ? gamesResponse : (gamesResponse?.games || []);
+      const sales = Array.isArray(salesResponse) ? salesResponse : (salesResponse?.vendas || []);
+      const reviews = Array.isArray(reviewsResponse) ? reviewsResponse : (reviewsResponse?.reviews || []);
+      const categories = Array.isArray(categoriesResponse) ? categoriesResponse : (categoriesResponse?.categories || []);
+
+      // --- CÁLCULOS DE ESTATÍSTICAS (FRONTEND) ---
+
+      // 1. Totais Gerais
+      const totalGames = games.length;
+      const totalRevenue = sales.reduce((acc: number, sale: any) => acc + (sale.valor_total || sale.total || 0), 0);
+      const totalSalesCount = sales.length; // Número de pedidos
+      
+      // Média de avaliações global
+      const avgRating = reviews.length > 0 
+        ? (reviews.reduce((acc: number, r: any) => acc + (r.nota || r.rating || 0), 0) / reviews.length)
+        : 0;
+
+      // 2. Vendas por Categoria (Simulado cruzando jogos vendidos)
+      // Como a venda tem itens, precisaríamos ver os itens. Se o endpoint de venda não traz itens,
+      // vamos simular distribuindo pelos jogos cadastrados (ou usar dados reais se disponíveis).
+      // Aqui vamos agrupar jogos por categoria para ter um gráfico.
+      const gamesByCategory = games.reduce((acc: any, game: any) => {
+         const cat = game.categoria || 'Outros';
+         acc[cat] = (acc[cat] || 0) + 1;
+         return acc;
+      }, {});
+      
+      const categoryData = Object.entries(gamesByCategory).map(([name, value]) => ({ name, value }));
+
+      // 3. Top Jogos (Baseado em Rating, já que não temos itens vendidos detalhados aqui fácil)
+      const sortedByRating = [...games].sort((a: any, b: any) => (b.nota_media || 0) - (a.nota_media || 0));
+      const top5Games = sortedByRating.slice(0, 5).map((g: any) => ({
+        name: g.nome,
+        rating: g.nota_media || 0,
+        category: g.categoria
+      }));
+
+      // 4. Receita Mensal (Agrupando vendas por mês)
+      const salesByMonthMap = sales.reduce((acc: any, sale: any) => {
+         const date = new Date(sale.data_venda || sale.date);
+         const key = `${date.getMonth() + 1}/${date.getFullYear()}`;
+         acc[key] = (acc[key] || 0) + (sale.valor_total || sale.total || 0);
+         return acc;
+      }, {});
+      
+      const salesByMonth = Object.entries(salesByMonthMap).map(([month, value]) => ({ month, value }));
+
+
+      // SETAR ESTADOS
+      setStatistics({
+        totalGames,
+        totalRevenue,
+        totalSales: totalSalesCount,
+        totalReviews: reviews.length,
+        avgRating,
+        salesByMonth, // Gráfico de linha
+        categorySales: categoryData // Gráfico de pizza (Distribuição de jogos)
+      });
+
+      setTopGames(top5Games);
+      
+      setRankings({
+        byRating: sortedByRating.slice(0, 10),
+        bySales: [] // Sem dados detalhados de itens vendidos, deixamos vazio ou simulamos
+      });
+      
+      setSalesByCategory(categoryData);
+
     } catch (error) {
-      console.error('Error loading reports:', error);
+      console.error('Error calculating stats:', error);
       toast.error('Erro ao carregar relatórios');
     } finally {
       setIsLoading(false);
@@ -118,24 +166,24 @@ export function AdminPageComplete({ onNavigate }: AdminPageCompleteProps) {
 
     const stats = [
       {
-        title: 'Total de Vendas',
+        title: 'Receita Total',
         value: `R$ ${(statistics.totalRevenue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
         icon: DollarSign,
-        trend: '+12.5% este mês',
+        trend: 'Total acumulado',
         color: 'text-accent-purple'
       },
       {
-        title: 'Total de Jogos',
+        title: 'Jogos Cadastrados',
         value: statistics.totalGames || 0,
         icon: Package,
-        trend: `${statistics.totalGames || 0} cadastrados`,
+        trend: 'Em catálogo',
         color: 'text-accent-purple'
       },
       {
-        title: 'Jogos Vendidos',
+        title: 'Vendas Realizadas',
         value: statistics.totalSales || 0,
         icon: TrendingUp,
-        trend: `${statistics.totalSales || 0} unidades`,
+        trend: 'Pedidos concluídos',
         color: 'text-accent-purple'
       },
       {
@@ -177,8 +225,8 @@ export function AdminPageComplete({ onNavigate }: AdminPageCompleteProps) {
     <div className="space-y-8">
       {renderStatsCards()}
       
-      {/* Revenue Chart */}
-      {statistics?.salesByMonth && statistics.salesByMonth.length > 0 && (
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Revenue Chart */}
         <Card className="bg-secondary-bg border-border">
           <CardHeader>
             <CardTitle className="text-main-text flex items-center">
@@ -186,19 +234,16 @@ export function AdminPageComplete({ onNavigate }: AdminPageCompleteProps) {
               Receita Mensal
             </CardTitle>
             <CardDescription className="text-secondary-text">
-              Evolução da receita nos últimos meses
+              Evolução das vendas por mês
             </CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={statistics.salesByMonth}>
+              <LineChart data={statistics?.salesByMonth || []}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#333" />
                 <XAxis 
                   dataKey="month" 
                   tick={{ fill: '#A0A0A0' }}
-                  angle={-45}
-                  textAnchor="end"
-                  height={80}
                 />
                 <YAxis tick={{ fill: '#A0A0A0' }} />
                 <Tooltip 
@@ -216,132 +261,40 @@ export function AdminPageComplete({ onNavigate }: AdminPageCompleteProps) {
                   stroke="#9146FF" 
                   strokeWidth={3}
                   dot={{ fill: '#9146FF', r: 5 }}
-                  activeDot={{ r: 7 }}
                 />
               </LineChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
-      )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Top Games Bar Chart */}
-        {topGames.length > 0 && (
-          <Card className="bg-secondary-bg border-border">
-            <CardHeader>
-              <CardTitle className="text-main-text flex items-center">
-                <BarChart3 className="w-5 h-5 mr-2" />
-                Jogos Mais Vendidos
-              </CardTitle>
-              <CardDescription className="text-secondary-text">
-                Top {topGames.length} jogos por vendas
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={topGames.slice(0, 5)}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-                  <XAxis 
-                    dataKey="name" 
-                    tick={{ fill: '#A0A0A0', fontSize: 12 }}
-                    angle={-45}
-                    textAnchor="end"
-                    height={100}
-                  />
-                  <YAxis tick={{ fill: '#A0A0A0' }} />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: '#1E1E1E', 
-                      border: '1px solid #333', 
-                      borderRadius: '8px',
-                      color: '#EAEAEA'
-                    }}
-                    formatter={(value: any) => [`${value} vendas`, 'Total']}
-                  />
-                  <Bar 
-                    dataKey="sales" 
-                    fill="#9146FF" 
-                    radius={[8, 8, 0, 0]}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Category Distribution Pie Chart */}
-        {statistics?.salesByCategory && statistics.salesByCategory.length > 0 && (
-          <Card className="bg-secondary-bg border-border">
-            <CardHeader>
-              <CardTitle className="text-main-text flex items-center">
-                <PieChartIcon className="w-5 h-5 mr-2" />
-                Vendas por Categoria
-              </CardTitle>
-              <CardDescription className="text-secondary-text">
-                Distribuição de vendas entre categorias
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={statistics.salesByCategory}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {statistics.salesByCategory.map((entry: any, index: number) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: '#1E1E1E', 
-                      border: '1px solid #333', 
-                      borderRadius: '8px',
-                      color: '#EAEAEA'
-                    }}
-                    formatter={(value: any) => [`${value} vendas`, 'Total']}
-                  />
-                  <Legend 
-                    wrapperStyle={{ color: '#A0A0A0' }}
-                    iconType="circle"
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        )}
-      </div>
-
-      {/* Top Games by Company */}
-      {topGamesByCompany.length > 0 && (
+        {/* Category Distribution */}
         <Card className="bg-secondary-bg border-border">
           <CardHeader>
             <CardTitle className="text-main-text flex items-center">
-              <BarChart3 className="w-5 h-5 mr-2" />
-              Jogos Mais Vendidos por Empresa
+              <PieChartIcon className="w-5 h-5 mr-2" />
+              Distribuição de Jogos
             </CardTitle>
             <CardDescription className="text-secondary-text">
-              Jogo mais vendido de cada empresa
+              Jogos por categoria
             </CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={topGamesByCompany}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-                <XAxis 
-                  dataKey="company" 
-                  tick={{ fill: '#A0A0A0', fontSize: 12 }}
-                  angle={-45}
-                  textAnchor="end"
-                  height={100}
-                />
-                <YAxis tick={{ fill: '#A0A0A0' }} />
+              <PieChart>
+                <Pie
+                  data={statistics?.categorySales || []}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={100}
+                  paddingAngle={5}
+                  dataKey="value"
+                  label
+                >
+                  {(statistics?.categorySales || []).map((_: any, index: number) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
                 <Tooltip 
                   contentStyle={{ 
                     backgroundColor: '#1E1E1E', 
@@ -349,218 +302,99 @@ export function AdminPageComplete({ onNavigate }: AdminPageCompleteProps) {
                     borderRadius: '8px',
                     color: '#EAEAEA'
                   }}
-                  formatter={(value: any, name: any, props: any) => [
-                    `${props.payload.topGame?.name || 'N/A'} - ${value} vendas`,
-                    'Jogo'
-                  ]}
                 />
-                <Bar 
-                  dataKey="totalSales" 
-                  fill="#00BFFF" 
-                  radius={[8, 8, 0, 0]}
-                />
-              </BarChart>
+                <Legend wrapperStyle={{ color: '#A0A0A0' }} />
+              </PieChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
-      )}
+      </div>
     </div>
   );
 
   const renderRankings = () => (
     <div className="space-y-8">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Rankings by Rating */}
-        {rankings?.byRating && rankings.byRating.length > 0 && (
-          <Card className="bg-secondary-bg border-border">
+        <Card className="bg-secondary-bg border-border">
             <CardHeader>
-              <CardTitle className="text-main-text flex items-center">
+            <CardTitle className="text-main-text flex items-center">
                 <Star className="w-5 h-5 mr-2 text-yellow-400" />
-                Ranking por Avaliação
-              </CardTitle>
-              <CardDescription className="text-secondary-text">
-                Jogos com melhor avaliação
-              </CardDescription>
+                Melhores Avaliados
+            </CardTitle>
+            <CardDescription className="text-secondary-text">
+                Jogos com as maiores notas médias
+            </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {rankings.byRating.slice(0, 10).map((game: any, index: number) => (
-                  <div key={game.id} className="flex items-center justify-between p-3 bg-main-bg rounded-lg">
+            <div className="space-y-4">
+                {rankings?.byRating?.map((game: any, index: number) => (
+                <div key={game.id || index} className="flex items-center justify-between p-3 bg-main-bg rounded-lg">
                     <div className="flex items-center space-x-3">
-                      <span className="text-accent-purple font-bold text-lg w-6">#{index + 1}</span>
-                      <div>
-                        <p className="text-main-text">{game.name}</p>
-                        <p className="text-secondary-text text-sm">{game.category}</p>
-                      </div>
+                    <span className="text-accent-purple font-bold text-lg w-6">#{index + 1}</span>
+                    <div>
+                        <p className="text-main-text font-bold">{game.nome || game.name}</p>
+                        <p className="text-secondary-text text-sm">{game.categoria}</p>
+                    </div>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                      <span className="text-main-text">{game.rating.toFixed(1)}</span>
+                    <Star className="w-4 h-4 text-yellow-400 fill-current" />
+                    <span className="text-main-text font-bold">{(game.nota_media || 0).toFixed(1)}</span>
                     </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Rankings by Sales */}
-        {rankings?.bySales && rankings.bySales.length > 0 && (
-          <Card className="bg-secondary-bg border-border">
-            <CardHeader>
-              <CardTitle className="text-main-text flex items-center">
-                <TrendingUp className="w-5 h-5 mr-2 text-success" />
-                Ranking por Vendas
-              </CardTitle>
-              <CardDescription className="text-secondary-text">
-                Jogos mais vendidos
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {rankings.bySales.slice(0, 10).map((game: any, index: number) => (
-                  <div key={game.id} className="flex items-center justify-between p-3 bg-main-bg rounded-lg">
-                    <div className="flex items-center space-x-3">
-                      <span className="text-accent-purple font-bold text-lg w-6">#{index + 1}</span>
-                      <div>
-                        <p className="text-main-text">{game.name}</p>
-                        <p className="text-secondary-text text-sm">{game.category}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <TrendingUp className="w-4 h-4 text-success" />
-                      <span className="text-main-text">{game.sales} vendas</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-      </div>
-
-      {/* Rankings by Category */}
-      {rankingsByCategory.length > 0 && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {rankingsByCategory.map((categoryRanking: any) => (
-            <Card key={categoryRanking.category} className="bg-secondary-bg border-border">
-              <CardHeader>
-                <CardTitle className="text-main-text">
-                  Top {categoryRanking.category}
-                </CardTitle>
-                <CardDescription className="text-secondary-text">
-                  {categoryRanking.totalSales} vendas totais
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {categoryRanking.topGames.slice(0, 5).map((game: any, index: number) => (
-                    <div key={game.id} className="flex items-center justify-between p-2 bg-main-bg rounded-lg">
-                      <div className="flex items-center space-x-2">
-                        <span className="text-accent-purple font-bold text-sm w-5">#{index + 1}</span>
-                        <div>
-                          <p className="text-main-text text-sm">{game.name}</p>
-                          <p className="text-secondary-text text-xs">{game.company}</p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-main-text text-sm">{game.sales} vendas</p>
-                        <p className="text-secondary-text text-xs flex items-center justify-end">
-                          <Star className="w-3 h-3 text-yellow-400 fill-current mr-1" />
-                          {game.rating?.toFixed(1) || '0.0'}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
                 </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+                ))}
+            </div>
+            </CardContent>
+        </Card>
     </div>
   );
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-main-bg flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="w-12 h-12 text-accent-purple animate-spin mx-auto mb-4" />
-          <p className="text-secondary-text">Carregando relatórios...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-main-bg">
-      <div className="container mx-auto px-4 sm:px-6 py-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 space-y-4 sm:space-y-0">
-          <div className="flex items-center space-x-4">
-            <Button 
-              onClick={() => onNavigate('home')}
-              variant="outline"
-              className="border-border text-secondary-text hover:text-main-text"
-              aria-label="Voltar para página inicial"
-            >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Voltar
-            </Button>
-            <div>
-              <h1 className="text-2xl lg:text-3xl text-main-text">Painel Administrativo</h1>
-              <p className="text-secondary-text">Bem-vindo, {user?.name}</p>
-            </div>
+    <div className="min-h-screen bg-main-bg py-8">
+      <div className="container mx-auto px-6">
+        <div className="mb-8 flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl text-main-text mb-2 font-bold">Dashboard</h1>
+            <p className="text-secondary-text">Visão geral da loja</p>
           </div>
-          
-          <div className="flex space-x-2">
-            <Button 
-              onClick={() => onNavigate('management')}
-              variant="outline"
-              className="border-border text-secondary-text hover:text-main-text"
-              aria-label="Ir para gerenciamento"
-            >
-              <Settings className="w-4 h-4 mr-2" />
-              Gerenciar
-            </Button>
-            <Button 
-              onClick={handleLogout}
-              variant="outline"
-              className="border-error text-error hover:bg-error hover:text-white"
-              aria-label="Fazer logout"
-            >
-              <LogOut className="w-4 h-4 mr-2" />
-              Logout
-            </Button>
-          </div>
+          <Button 
+             onClick={() => onNavigate('management')}
+             className="bg-accent-purple hover:bg-accent-hover"
+          >
+             <Settings className="w-4 h-4 mr-2" />
+             Gerenciar Conteúdo
+          </Button>
         </div>
 
-        {/* Navigation Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2 bg-secondary-bg border border-border">
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="bg-secondary-bg border-b border-border w-full justify-start p-0 h-auto rounded-none">
             <TabsTrigger 
-              value="dashboard" 
-              className="data-[state=active]:bg-accent-purple data-[state=active]:text-white"
+                value="dashboard" 
+                className="data-[state=active]:border-b-2 data-[state=active]:border-accent-purple data-[state=active]:bg-transparent rounded-none py-4 px-6"
             >
               <BarChart3 className="w-4 h-4 mr-2" />
-              Dashboard
+              Visão Geral
             </TabsTrigger>
             <TabsTrigger 
-              value="rankings" 
-              className="data-[state=active]:bg-accent-purple data-[state=active]:text-white"
+                value="rankings" 
+                className="data-[state=active]:border-b-2 data-[state=active]:border-accent-purple data-[state=active]:bg-transparent rounded-none py-4 px-6"
             >
               <Star className="w-4 h-4 mr-2" />
               Rankings
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="dashboard">
-            {renderDashboard()}
-          </TabsContent>
-
-          <TabsContent value="rankings">
-            {renderRankings()}
-          </TabsContent>
+          <div className="mt-8">
+            {isLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 text-accent-purple animate-spin" />
+              </div>
+            ) : (
+              <>
+                <TabsContent value="dashboard">{renderDashboard()}</TabsContent>
+                <TabsContent value="rankings">{renderRankings()}</TabsContent>
+              </>
+            )}
+          </div>
         </Tabs>
       </div>
     </div>
