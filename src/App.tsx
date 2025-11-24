@@ -40,10 +40,11 @@ export default function App() {
     if (currentPage !== "home") setCurrentPage("home");
   };
 
-  return (
-    <AuthProvider>
-      <CartProvider>
-        <ToastProvider>
+ return (
+    <ToastProvider>
+      <AuthProvider>
+        <CartProvider>
+
           <AppContent
             currentPage={currentPage}
             pageData={pageData}
@@ -51,9 +52,10 @@ export default function App() {
             searchTerm={searchTerm}
             onSearchChange={handleSearchChange}
           />
-        </ToastProvider>
-      </CartProvider>
-    </AuthProvider>
+
+        </CartProvider>
+      </AuthProvider>
+    </ToastProvider>
   );
 }
 
