@@ -305,7 +305,7 @@ export function UserProfilePageNew({ onNavigate }: UserProfilePageNewProps) {
                             </div>
                         </div>
 
-                        {/* BLOCO DE AÇÃO: BOTÃO + LIXEIRA ALINHADOS abaixo */}
+                        {/* BLOCO DE AÇÃO: BOTÃO + LIXEIRA ALINHADOS */}
                         <div className="flex justify-between items-center gap-2">
                             <Button className="flex-1 bg-accent-purple hover:bg-accent-hover" onClick={() => onNavigate('details', { gameId: item.id })}>
                                 Ver Detalhes
