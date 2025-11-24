@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 interface UserProfilePageNewProps {
   onNavigate: (page: PageType, data?: any) => void;
 }
-
+//Código Final
 export function UserProfilePageNew({ onNavigate }: UserProfilePageNewProps) {
   const [activeSection, setActiveSection] = useState('profile');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
