@@ -4,7 +4,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { useAuth } from './AuthContext';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -118,11 +118,9 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login', onLogin }: A
           </p>
           {mode === 'login' && (
             <div className="mt-3 p-3 bg-main-bg rounded-lg border border-border">
-              <p className="text-xs text-secondary-text mb-2">Credenciais após setup inicial:</p>
+              
               <div className="space-y-1 text-xs text-secondary-text">
-                <p><strong>Admin:</strong> admin@synthx.com</p>
-                <p><strong>Senha:</strong> admin123</p>
-                <p className="text-accent-purple mt-2">Execute o wizard de setup na primeira vez!</p>
+              
                 <button
                   type="button"
                   onClick={() => {
@@ -131,7 +129,7 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login', onLogin }: A
                   }}
                   className="text-xs text-accent-purple hover:underline mt-2 block"
                 >
-                  Não funcionou? Voltar ao wizard de setup
+            
                 </button>
               </div>
             </div>
